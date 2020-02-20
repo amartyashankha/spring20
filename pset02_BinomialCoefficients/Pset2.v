@@ -188,12 +188,62 @@ Qed.
 Lemma seq_spec: forall f count i start, i < count -> ith i (seq f count start) = f (start + i).
 Proof.
   induct count; simplify.
-Admitted.
+  -
+    linear_arithmetic.
+  -
+    unfold_recurse (seq f) count.
+    cases i.
+    1: {
+      simplify.
+      f_equal.
+      linear_arithmetic.
+    }
+    replace (N.pos p) with (N.pos p - 1 + 1) by linear_arithmetic.
+    unfold_recurse ith (N.pos p - 1).
+    specialize IHcount with (i := (N.pos p - 1)) (start := start + 1).
+    cases (N.pos p - 1 <? count).
+    2: {
+      Search(_ <? _ = false).
+      apply N.ltb_nlt in Heq.
+      linear_arithmetic.
+    }
+    Search(_ <? _ = true).
+    apply N.ltb_lt in Heq.
+    propositional.
+    rewrite H0.
+    f_equal.
+    linear_arithmetic.
+Qed.
+
 
 (* Exercise: Prove that if the index is out of bounds, "ith" returns 0. *)
 Lemma ith_out_of_bounds_0: forall i l, len l <= i -> ith i l = 0.
 Proof.
-Admitted.
+  induct i.
+  -
+    intros.
+    cases (len l).
+    2: {
+      linear_arithmetic.
+    }
+    cases l.
+    1: {
+      simplify; trivial.
+    }
+    unfold ith; simplify.
+    linear_arithmetic.
+  -
+    intros.
+    unfold_recurse ith i.
+    cases l.
+    1: {
+      linear_arithmetic.
+    }
+    simplify.
+    assert (len l <= i) by linear_arithmetic.
+    specialize IHi with (l := l).
+    propositional.
+Qed.
 
 
 (* Binomial coefficients *)
@@ -287,15 +337,38 @@ Qed.
 
 Lemma fact_nonzero: forall n, n! <> 0.
 Proof.
-Admitted.
+  intros.
+  induct n.
+  1: {
+    simplify; linear_arithmetic.
+  }
+  unfold_recurse fact n.
+  assert (n + 1 <> 0) by linear_arithmetic.
+  apply N.neq_mul_0.
+  propositional.
+Qed.
 
 Lemma Cn0: forall n, C n 0 = 1.
 Proof.
-Admitted.
+  intros.
+  unfold C.
+  replace (n - 0) with n by linear_arithmetic.
+  simplify.
+  replace (n! * 1) with (n!) by linear_arithmetic.
+  apply N.div_same.
+  apply fact_nonzero.
+Qed.
 
 Lemma Cnn: forall n, C n n = 1.
 Proof.
-Admitted.
+  intros.
+  unfold C.
+  replace (n - n) with 0 by linear_arithmetic.
+  simplify.
+  replace (1 * n!) with (n!) by linear_arithmetic.
+  apply N.div_same.
+  apply fact_nonzero.
+Qed.
 
 
 (* It's somewhat surprising that in the definition of C(n, k),
@@ -328,30 +401,41 @@ Proof.
    The output of this command shows us all notations involving "|", and the last one (N.divide) is the one
    we want. So we just unfold that one: *)
     unfold N.divide.
-    exists 1. equality.
+    exists 1.
+    equality.
   - simplify. unfold N.divide in *.
-    assert (k = 0 \/ k = n + 1 \/ 1 <= k <= n) as C by linear_arithmetic. cases C.
-    + subst.
+    assert (k = 0 \/ k = n + 1 \/ 1 <= k <= n) as C by linear_arithmetic.
+    cases C.
+    +
+      subst.
       replace (n + 1 - 0) with (n + 1) by linear_arithmetic.
       replace (0!) with 1 by equality.
       exists 1.
       linear_arithmetic.
-    + subst.
+    +
+      subst.
       replace (n + 1 - (n + 1)) with 0 by linear_arithmetic.
       replace (0!) with 1 by equality.
       exists 1. linear_arithmetic.
-    + pose proof (IHn k) as IH1.
-      assert (k <= n) as A by linear_arithmetic. specialize (IH1 A). invert IH1.
+    +
+      pose proof (IHn k) as IH1.
+      assert (k <= n) as A by linear_arithmetic.
+      specialize (IH1 A).
+      invert IH1.
       pose proof (IHn (k - 1)) as IH2.
-      assert (k - 1 <= n) as B by linear_arithmetic. specialize (IH2 B). invert IH2.
+      assert (k - 1 <= n) as B by linear_arithmetic.
+      specialize (IH2 B).
+      invert IH2.
       replace (n - (k - 1)) with (n - k + 1) in H1 by linear_arithmetic.
       unfold_recurse fact n.
       replace (k!) with ((k - 1 + 1)!) in *.
       2: { f_equal. linear_arithmetic. }
       unfold_recurse fact (k - 1).
       replace (k - 1 + 1) with k in * by linear_arithmetic.
-      apply N.mul_cancel_r with (p := n - k + 1) in H0. 2: linear_arithmetic.
-      apply N.mul_cancel_r with (p := k) in H1. 2: linear_arithmetic.
+      apply N.mul_cancel_r with (p := n - k + 1) in H0.
+      2: linear_arithmetic.
+      apply N.mul_cancel_r with (p := k) in H1.
+      2: linear_arithmetic.
       assert (forall l1 r1 l2 r2, l1 = r1 -> l2 = r2 -> l1 + l2 = r1 + r2) as E. {
         simplify. linear_arithmetic.
       }
@@ -422,6 +506,96 @@ Here we go: *)
 Lemma bcoeff_correct: forall n k, k <= n -> bcoeff n k = C n k.
 Proof.
   induct k.
+  -
+    unfold C.
+    simplify.
+    replace (n - 0) with n by linear_arithmetic.
+    replace (n! * 1) with (n!) by linear_arithmetic.
+    assert (n! <> 0).
+    1: apply fact_nonzero.
+    symmetry.
+    apply N.div_same.
+    apply fact_nonzero.
+  -
+    propositional.
+    cases ((n - (k + 1)) =? 0).
+    1: {
+      Search(_ =? _ = true).
+      apply Neqb_ok in Heq.
+      assert (n = k + 1) by linear_arithmetic.
+      unfold_recurse (bcoeff n) k.
+      unfold C.
+      replace (k + 1) with n.
+      assert (k <= n) by linear_arithmetic.
+      specialize (IHk H1).
+      rewrite IHk.
+      unfold C.
+      replace (n - n) with 0 by linear_arithmetic.
+      simplify.
+      replace (n - k) with 1 by linear_arithmetic.
+      replace k with (n - 1) by linear_arithmetic.
+      replace (1!) with 1.
+      2: { simplify; linear_arithmetic. }
+      replace (1 * n!) with (n!) by linear_arithmetic.
+      replace (n! / n!) with 1.
+      2: { symmetry. apply N.div_same. apply fact_nonzero. }
+      assert (n <> 0) by linear_arithmetic.
+      replace (1 * (n - 1)!) with ((n - 1)!) by linear_arithmetic.
+      replace (n!) with ((n - 1 + 1)!).
+      2: { f_equal. linear_arithmetic. }
+      unfold_recurse fact (n - 1).
+      rewrite N.div_mul with (a := (n - 1 + 1)) (b := (n - 1)!).
+      2: { apply fact_nonzero. }
+      replace (n - 1 + 1) with n by linear_arithmetic.
+      replace (n * 1) with n by linear_arithmetic.
+      apply N.div_same.
+      assumption.
+    }
+    Search(_ =? _ = false).
+    apply N.eqb_neq in Heq.
+    unfold C.
+    replace (n - (k + 1)) with (n - k - 1) by linear_arithmetic.
+    unfold_recurse fact k.
+    assert ((n - k) * n! / ((n - k) * (n - k - 1)! * (k + 1)!) = n! / ((n - k - 1)! * (k + 1)!)).
+    1: {
+      assert (n - k <> 0) by linear_arithmetic.
+      Search(?x * _ /(?x * _)).
+      replace ((n - k - 1)! * (k + 1)!) with (((n - k - 1)! * (k + 1)!)) by linear_arithmetic.
+      rewrite N.div_mul_cancel_l with (c := n - k) (a := n!) (b := (n - k - 1)! * (k + 1)!).
+
+    unfold_recurse (bcoeff n) k.
+    assert (k <= n) by linear_arithmetic.
+    specialize (IHk H0).
+    rewrite IHk.
+    unfold C.
+    replace (n - k) with (n - (k + 1) + 1) by linear_arithmetic.
+    unfold_recurse fact (n - (k + 1)).
+    replace ((k + 1)!) with (k! * (k + 1)).
+    2: { unfold_recurse fact k.  lia. }
+    remember (n - (k + 1) + 1) as F0.
+    remember ((n - (k + 1))!) as F1.
+    remember (k + 1) as F2.
+    remember (n!) as F3.
+    remember (k!) as F4.
+    assert (F0 <> 0) by linear_arithmetic.
+    assert (F1 <> 0).
+    1: { rewrite HeqF1. apply fact_nonzero. }
+    assert (F2 <> 0) by linear_arithmetic.
+    assert (F3 <> 0).
+    1: { rewrite HeqF3. apply fact_nonzero. }
+    assert (F4 <> 0).
+    1: { rewrite HeqF4. apply fact_nonzero. }
+    replace (F3 / (F0 * F1 * F4) * F0) with (F0 * F3 / (F0 * F1 * F4)).
+    2: {
+      rewrite N.mul_comm with (n := (F3 / (F0 * F1 * F4))) (m := F0).
+      rewrite N. with (n := (F3 / (F0 * F1 * F4))) (m := F0).
+      Search(_ * _ / _).
+  F3 / (F0 * F1 * F4) * F0 / F2 = F3 / (F1 * (F4 * F2))
+
+    1: { linear_arithmetic.
+    Search(_ / _ = _).
+    nia.
+    unfold_recurse (bcoeff n) 0.
 Admitted.
 
 
