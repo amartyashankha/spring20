@@ -555,13 +555,37 @@ Proof.
     apply N.eqb_neq in Heq.
     unfold C.
     replace (n - (k + 1)) with (n - k - 1) by linear_arithmetic.
-    unfold_recurse fact k.
     assert ((n - k) * n! / ((n - k) * (n - k - 1)! * (k + 1)!) = n! / ((n - k - 1)! * (k + 1)!)).
     1: {
       assert (n - k <> 0) by linear_arithmetic.
       Search(?x * _ /(?x * _)).
       replace ((n - k - 1)! * (k + 1)!) with (((n - k - 1)! * (k + 1)!)) by linear_arithmetic.
+      Search(_ * _ * _).
+      replace ((n - k) * (n - k - 1)! * (k + 1)!) with ((n - k) * ((n - k - 1)! * (k + 1)!)).
+      2 : {
+        rewrite N.mul_assoc with (n := (n - k)) (m := (n - k - 1)!) (p := (k + 1)!).
+        equality.
+      }
       rewrite N.div_mul_cancel_l with (c := n - k) (a := n!) (b := (n - k - 1)! * (k + 1)!).
+      2 : {
+        Search(_ * _ <> 0).
+        assert ((n - k - 1)! <> 0).
+        1 : { apply fact_nonzero. }
+        assert ((k + 1)! <> 0).
+        1 : { apply fact_nonzero. }
+        apply N.neq_mul_0 with (n := (n - k - 1)!) (m := (k + 1)!).
+        propositional.
+      }
+      2 : { assumption. }
+      equality.
+    }
+    replace (n! / ((n - k - 1)! * (k + 1)!)) with ((n - k) * n! / ((n - k) * (n - k - 1)! * (k + 1)!) ).
+    replace ((n - k) * (n - k - 1)!) with ((n - k - 1 + 1) * (n - k - 1)!) by nia.
+    assert ((n - k - 1 + 1) * (n - k - 1)! = (n - k - 1 + 1)!).
+    1: { unfold_recurse fact (n - k - 1).  equality. }
+    rewrite H1.
+    replace (n - k - 1 + 1) with (n - k) by linear_arithmetic.
+    unfold_recurse fact k.
 
     unfold_recurse (bcoeff n) k.
     assert (k <= n) by linear_arithmetic.
