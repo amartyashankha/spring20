@@ -24,7 +24,6 @@ Set Default Goal Selector "!".
    feel free to ignore these points. On the other hand, if you want to know how
    many points each exercise earns you, you can find the points in Pset3Sig.v. *)
 
-
 (** ****** Polymorphic container types ****** *)
 
 (* First, we'll reproduce some definitions we need from Lecture 2,
@@ -65,24 +64,42 @@ Definition either {A} (xo yo : option A) : option A :=
 Theorem either_None_right : forall {A} (xo : option A),
     either xo None = xo.
 Proof.
-Admitted.
+  simplify.
+  cases xo.
+  1: simplify; equality.
+  simplify; equality.
+Qed.
+
+Ltac find_match_inside :=
+  match goal with
+    | [ |- context[either ?X _] ] => cases X
+  end.
 
 (* [either] is associative, just like [++]. *)
 Theorem either_assoc : forall {A} (xo yo zo : option A),
     either (either xo yo) zo = either xo (either yo zo).
 Proof.
-Admitted.
+  simplify.
+  cases xo.
+  1: simplify; equality.
+  simplify; f_equal; equality.
+Qed.
 
 (* [head] should compute the head of a list, that is,
  * it should return [Some] with the first element of
  * the list if the list is nonempty, and [None]
  * if the list is empty.
  *)
-Definition head {A} (xs : list A) : option A. Admitted.
+Definition head {A} (xs : list A) : option A :=
+  match xs with
+  | [] => None
+  | x :: l => Some x
+  end.
 
 Example head_example : head [1; 2; 3] = Some 1.
 Proof.
-Admitted.
+  simplify; equality.
+Qed.
 
 (* The following theorem makes a formal connection
  * between [either] and [++].
@@ -90,7 +107,11 @@ Admitted.
 Theorem either_app_head : forall {A} (xs ys : list A),
     head (xs ++ ys) = either (head xs) (head ys).
 Proof.
-Admitted.
+  simplify.
+  cases xs.
+  1: simplify; equality.
+  simplify; equality.
+Qed.
 
 
 (* [leftmost_Node] should compute the leftmost node of
@@ -100,13 +121,39 @@ Admitted.
  * recursion (i.e., pattern matching) on the [tree] argument,
  * without using the [flatten] operation.
  *)
-Fixpoint leftmost_Node {A} (t : tree A) : option A. Admitted.
+Fixpoint leftmost_Node {A} (t : tree A) : option A :=
+  match t with
+  | Leaf => None
+  | Node l d r => match l with
+                  | Leaf => Some d
+                  | Node _ _ _  => leftmost_Node l
+                  end
+  end.
 
 Example leftmost_Node_example :
     leftmost_Node (Node (Node Leaf 2 (Node Leaf 3 Leaf)) 1 Leaf)
     = Some 2.
+Proof. simplify; equality. Qed.
+
+Theorem leftmost_Node_either : forall {A} (l r : tree A) (d : A),
+    leftmost_Node (Node l d r) = either (leftmost_Node l) (Some d).
 Proof.
-Admitted.
+  simplify.
+  induct l.
+  1: simplify; equality.
+  propositional.
+  simplify.
+  rewrite H.
+  assert (either (leftmost_Node l1) (Some d) <> None).
+  1: {
+    cases (leftmost_Node l1).
+    1: simplify; equality.
+    simplify; equality.
+  }
+  cases (either (leftmost_Node l1) (Some d)).
+  1: simplify; equality.
+  simplify; equality.
+Qed.
 
 (* Prove that the leftmost node of the tree is the same
  * as the head of the list produced by flattening the tree
@@ -115,7 +162,18 @@ Admitted.
 Theorem leftmost_Node_head : forall {A} (t : tree A),
     leftmost_Node t = head (flatten t).
 Proof.
-Admitted.
+  intros.
+  induct t.
+  1: simplify; equality.
+  (*simplify.*)
+  replace (head (flatten (Node t1 d t2))) with (head (flatten t1 ++ d :: flatten t2)).
+  2: simplify; equality.
+  rewrite either_app_head with(xs := flatten t1) (ys := d :: flatten t2).
+  replace (head (d :: flatten t2)) with (Some d).
+  2: simplify; equality.
+  replace (head (flatten t1)) with (leftmost_Node t1).
+  apply leftmost_Node_either.
+Qed.
 
 
 (* A binary trie is a finite map keyed by lists of Booleans.
@@ -136,17 +194,29 @@ Definition binary_trie A := tree (option A).
  * for those keys that begin with [true], and the right subtree
  * contains entries for those keys that begin with [false].
  *)
-Fixpoint lookup {A} (k : list bool) (t : binary_trie A) {struct t} : option A. Admitted.
+Fixpoint lookup {A} (k : list bool) (t : binary_trie A) {struct t} : option A :=
+  match k with
+  | [] => match t with
+          | Leaf => None
+          | Node _ d _ => d
+          end
+  | true :: k' => match t with
+            | Leaf => None
+            | Node l _ _ => lookup k' l
+            end
+  | false :: k' => match t with
+                   | Leaf => None
+                   | Node _ _ r => lookup k' r
+                   end
+  end.
 
 Example lookup_example1 : lookup [] (Node Leaf (None : option nat) Leaf) = None.
-Proof.
-Admitted.
+Proof. simplify; equality. Qed.
 
 Example lookup_example2 : lookup [false; true]
     (Node (Node Leaf (Some 2) Leaf) None (Node (Node Leaf (Some 1) Leaf) (Some 3) Leaf))
                           = Some 1.
-Proof.
-Admitted.
+Proof. simplify; equality. Qed.
 
 (* [Leaf] represents an empty binary trie, so a lookup for
  * any key should return [None].
@@ -154,7 +224,12 @@ Admitted.
 Theorem lookup_empty {A} (k : list bool)
   : lookup k (Leaf : binary_trie A) = None.
 Proof.
-Admitted.
+  cases k.
+  1: simplify; equality.
+  cases b.
+  1: simplify; equality.
+  simplify; equality.
+Qed.
 
 
 (* Define an operation to "insert" a key and optional value
