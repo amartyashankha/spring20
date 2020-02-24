@@ -586,41 +586,47 @@ Proof.
     rewrite H1.
     replace (n - k - 1 + 1) with (n - k) by linear_arithmetic.
     unfold_recurse fact k.
-
     unfold_recurse (bcoeff n) k.
-    assert (k <= n) by linear_arithmetic.
-    specialize (IHk H0).
-    rewrite IHk.
-    unfold C.
-    replace (n - k) with (n - (k + 1) + 1) by linear_arithmetic.
-    unfold_recurse fact (n - (k + 1)).
-    replace ((k + 1)!) with (k! * (k + 1)).
-    2: { unfold_recurse fact k.  lia. }
-    remember (n - (k + 1) + 1) as F0.
-    remember ((n - (k + 1))!) as F1.
-    remember (k + 1) as F2.
-    remember (n!) as F3.
-    remember (k!) as F4.
-    assert (F0 <> 0) by linear_arithmetic.
-    assert (F1 <> 0).
-    1: { rewrite HeqF1. apply fact_nonzero. }
-    assert (F2 <> 0) by linear_arithmetic.
-    assert (F3 <> 0).
-    1: { rewrite HeqF3. apply fact_nonzero. }
-    assert (F4 <> 0).
-    1: { rewrite HeqF4. apply fact_nonzero. }
-    replace (F3 / (F0 * F1 * F4) * F0) with (F0 * F3 / (F0 * F1 * F4)).
+    replace ((k + 1) * k!) with (k! * (k + 1)) by nia.
+    replace ((n - k)! * (k! * (k + 1))) with ((n - k)! * k! * (k + 1)) by nia.
+    assert ((n - k) * n! / ((n - k)! * k! * (k + 1)) = (n - k) * n! / ((n - k)! * k!) / (k + 1)).
+    1: {
+      Search(_ / (_ * _)).
+      rewrite N.div_div with (a := (n - k) * n!) (b := (n - k)! * k!) (c := (k + 1)).
+      3: { linear_arithmetic. }
+      2: {
+        assert ((n - k)! <> 0).
+        1: { apply fact_nonzero. }
+        assert (k! <> 0).
+        1: { apply fact_nonzero. }
+        apply N.neq_mul_0 with (n := (n - k)!) (m := k!).
+        propositional.
+      }
+      equality.
+    }
+    rewrite H2.
+    Search(_ * _ / _).
+    assert (((n - k)! * k!) | n!).
+    1: { apply C_is_integer. linear_arithmetic. }
+    Search(_ * _ / _).
+    rewrite N.divide_div_mul_exact with (c := (n - k)) (a := n!) (b := ((n - k)! * k!)).
     2: {
-      rewrite N.mul_comm with (n := (F3 / (F0 * F1 * F4))) (m := F0).
-      rewrite N. with (n := (F3 / (F0 * F1 * F4))) (m := F0).
-      Search(_ * _ / _).
-  F3 / (F0 * F1 * F4) * F0 / F2 = F3 / (F1 * (F4 * F2))
-
-    1: { linear_arithmetic.
-    Search(_ / _ = _).
-    nia.
-    unfold_recurse (bcoeff n) 0.
-Admitted.
+      assert ((n - k)! <> 0).
+      1: { apply fact_nonzero. }
+      assert (k! <> 0).
+      1: { apply fact_nonzero. }
+      apply N.neq_mul_0 with (n := (n - k)!) (m := k!).
+      propositional.
+    }
+    2 : { assumption. }
+    replace ((n - k) * (n! / ((n - k)! * k!))) with ((n! / ((n - k)! * k!)) * (n - k)) by nia.
+    replace (n! / ((n - k)! * k!)) with (C n k).
+    2: { unfold C. equality. }
+    assert (k <= n) by linear_arithmetic.
+    specialize (IHk H4).
+    rewrite IHk.
+    equality.
+Qed.
 
 
 (* All binomial coefficients for a given n *)
@@ -679,8 +685,7 @@ But we can do even better by using Pascal's triangle:
    1 3 3 1
   1 4 6 4 1
 
-You can observe that the i-th row of this triangle is the result of "all_coeffs_slow1 i",
-and that each value not at the boundary of the triangle is the sum of the values to
+You can observe that the i-th row of this triangle is the result of "all_coeffs_slow1 i", and that each value not at the boundary of the triangle is the sum of the values to
 its upper left and its upper right. For instance, the 6 in the last row is the sum of the
 two 3s above it.
 More formally, we can state this as follows: *)
@@ -708,6 +713,42 @@ Definition all_coeffs_fast: N -> list N :=
 
 (* Time Compute all_coeffs_fast 200. takes 0.35s on my computer *)
 
+Lemma all_coeffs_fast_non_empty:
+  forall n, all_coeffs_fast n <> [].
+Proof.
+  simplify.
+  induct n.
+  1: { simplify. equality. }
+  unfold_recurse all_coeffs_fast n.
+  unfold nextLine.
+  equality.
+Qed.
+
+Lemma all_coeffs_fast_length:
+  forall n, len (all_coeffs_fast n) = n + 1.
+Proof.
+  induct n.
+  1: { simplify. linear_arithmetic. }
+  unfold_recurse all_coeffs_fast n.
+  unfold nextLine.
+  simplify.
+  rewrite IHn.
+  rewrite seq_len.
+  linear_arithmetic.
+Qed.
+
+Lemma C_n_n: forall n, C n n = 1.
+Proof.
+  simplify.
+  unfold C.
+  replace (n - n) with 0 by linear_arithmetic.
+  simplify.
+  replace (1 * n!) with (n!) by linear_arithmetic.
+  Search(_ / _ = 1).
+  apply N.div_same with (a := n!).
+  apply fact_nonzero.
+Qed.
+
 
 (* Exercise: Let's prove that all_coeffs_fast is correct.
    Note that you can assume Pascal's rule to prove this. *)
@@ -717,7 +758,91 @@ Lemma all_coeffs_fast_correct:
     k <= n ->
     ith k (all_coeffs_fast n) = C n k.
 Proof.
-Admitted.
+  induct n.
+  1: {
+    induct k.
+    1: { propositional. }
+    propositional.
+    assert (all_coeffs_fast 0 = [1]).
+    1: { simplify; equality. }
+    cases k.
+    1: { linear_arithmetic. }
+    linear_arithmetic.
+  }
+  induct k.
+  1: {
+    propositional.
+    unfold_recurse all_coeffs_fast n.
+    assert (nextLine (all_coeffs_fast n) <> []).
+    1: { unfold nextLine. equality. }
+    unfold ith.
+    simplify.
+    unfold C.
+    replace (n + 1 - 0) with (n + 1) by linear_arithmetic.
+    simplify.
+    replace ((n + 1)! * 1) with ((n + 1)!) by linear_arithmetic.
+    Search(_ / _ = 1).
+    rewrite N.div_same with (a := (n + 1)!).
+    1: { linear_arithmetic. }
+    apply fact_nonzero.
+  }
+  cases (k + 1 =? n + 1).
+  2: {
+    propositional.
+    unfold_recurse all_coeffs_fast n.
+    assert (nextLine (all_coeffs_fast n) <> []).
+    1: { unfold nextLine. equality. }
+    unfold nextLine.
+    unfold_recurse ith k.
+    rewrite all_coeffs_fast_length.
+    rewrite seq_spec.
+    2: { linear_arithmetic. }
+    replace (1 + k - 1) with k by linear_arithmetic.
+    replace (1 + k) with (k + 1) by linear_arithmetic.
+    pose proof (IHn k).
+    assert (k <= n) by linear_arithmetic.
+    propositional.
+    rewrite H4.
+    pose proof (IHn (k + 1)).
+    Search(_ =? _ = false).
+    apply N.eqb_neq in Heq.
+    Search(_ <= _ /\ _ <> _).
+    assert (k + 1 < n + 1).
+    1: { apply N.le_neq with (n := k + 1) (m := n + 1). propositional. }
+    assert (k + 1 <= n).
+    1: { linear_arithmetic. }
+    rewrite H2.
+    2: { assumption. }
+    rewrite H with (n := n) (k := k + 1).
+    2: { linear_arithmetic. }
+    replace (k + 1 - 1) with k by linear_arithmetic.
+    equality.
+  }
+  propositional.
+  unfold_recurse all_coeffs_fast n.
+  unfold nextLine.
+  unfold_recurse ith k.
+  apply Neqb_ok in Heq.
+  assert (k = n) by linear_arithmetic.
+  replace k with n by assumption.
+  rewrite all_coeffs_fast_length.
+  rewrite seq_spec.
+  2: { linear_arithmetic. }
+  replace (1 + n - 1) with n by linear_arithmetic.
+  assert (len (all_coeffs_fast n) = n + 1).
+  1: { apply all_coeffs_fast_length. }
+  replace (1 + n) with (n + 1) by linear_arithmetic.
+  rewrite ith_out_of_bounds_0 with (i := n + 1).
+  2: { linear_arithmetic. }
+  assert (n <= n) by linear_arithmetic.
+  specialize (IHn n).
+  propositional.
+  rewrite H4.
+  replace (C n n + 0) with (C n n) by linear_arithmetic.
+  rewrite C_n_n.
+  rewrite C_n_n with (n := n + 1).
+  equality.
+Qed.
 
 (* ----- THIS IS THE END OF PSET2 ----- All exercises below this line are optional. *)
 
