@@ -502,6 +502,16 @@ Proof.
   linear_arithmetic.
 Qed.
 
+Lemma fun_ext_inverse{A B: Type} (f: A -> B) (g: A -> B): (exists x, (f x) <> (g x)) -> ~ (f = g).
+Proof.
+  simplify.
+  unfold not.
+  intros.
+  subst f.
+  invert H.
+  equality.
+Qed.
+
 (* On the other hand, note that the other direction does not hold, because
    if a subtraction on natural numbers underflows, it just returns 0, so
    there are several [x] for which [x-2] returns 0 (namely 0, 1, and 2),
@@ -511,10 +521,18 @@ Proof.
   unfold not.
   unfold inverse.
   unfold compose.
-  propositional.
-  rewrite fun_ext with (g := (fun x : nat => x - 2 + 2)) (f := id) in H.
-  (* TODO: Finish <25-02-20, shankha> *)
-Admitted.
+  Search(~ (forall _, _)) (exists _, ~_).
+  remember (fun x : nat => x - 2 + 2) as F.
+  assert (exists x, F x <> id x).
+  2: {
+    apply fun_ext_inverse.
+    assumption.
+  }
+  exists 0.
+  rewrite HeqF.
+  unfold id.
+  linear_arithmetic.
+Qed.
 
 (* The identity function is the inverse of itself.
    Note: we're using "@" in front of "id" to say "we want to provide all implicit
