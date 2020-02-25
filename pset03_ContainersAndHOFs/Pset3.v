@@ -293,20 +293,29 @@ Qed.
 Theorem lookup_insert {A} (k : list bool) (v : option A) (t : binary_trie A) :
   lookup k (insert k v t) = v.
 Proof.
-  induct t.
-  1: {
-    unfold insert.
-    apply lookup_insert_into_empty_trie.
-  }
   induct k.
-  1: simplify; equality.
+  1: {
+    induct t.
+    1: simplify; equality.
+    unfold insert.
+    unfold lookup.
+    equality.
+  }
+  induct t.
+  1: { unfold insert. apply lookup_insert_into_empty_trie. }
+  simplify.
   cases a.
   1: {
-    simplify.
-    (* TODO: Finish this! <24-02-20, shankha> *)
-    invert IHt1.
-
-Admitted.
+    specialize IHk with (t := t1) (v := v).
+    replace (lookup (true :: k) (Node (insert k v t1) d t2)) with (lookup k (insert k v t1)).
+    1: assumption.
+    unfold lookup; equality.
+  }
+  specialize IHk with (t := t2) (v := v).
+  replace (lookup (false :: k) (Node t1 d (insert k v t2))) with (lookup k (insert k v t2)).
+  1: assumption.
+  unfold lookup; equality.
+Qed.
 
 
 (** ****** Higher-order functions ****** *)
@@ -393,8 +402,12 @@ Example selfCompose_square: selfCompose (fun (x: nat) => x * x) 3 2 = 256. Proof
 Theorem map_id : forall {A : Type} (xs : list A),
     map id xs = xs.
 Proof.
-    (* TODO: Finish this! <24-02-20, shankha> *)
-Admitted.
+  induct xs.
+  1: equality.
+  simplify.
+  rewrite IHxs.
+  equality.
+Qed.
 
 (* If we map the composition of two functions over the list,
  * it's the same as mapping the first function over the whole list
@@ -403,21 +416,41 @@ Admitted.
 Theorem map_compose : forall {A B C : Type} (g : B -> C) (f : A -> B) (xs : list A),
     map (g ∘ f) xs = map g (map f xs).
 Proof.
-Admitted.
+  induct xs.
+  1: simplify; equality.
+  simplify.
+  rewrite IHxs.
+  unfold compose.
+  equality.
+Qed.
 
 (* Just like we defined [map] for lists, we can similarly define
  * a higher-order function [tree_map] which applies a function on
  * elements to all of the elements in the tree, leaving the tree
  * structure intact.
  *)
-Fixpoint tree_map {A B : Type} (f : A -> B) (t : tree A)
-  : tree B. Admitted.
+Fixpoint tree_map {A B : Type} (f : A -> B) (t : tree A) : tree B :=
+  match t with
+  | Leaf => Leaf
+  | Node l d r => Node (tree_map f l) (f d) (tree_map f r)
+  end.
 
 Example tree_map_example :
   tree_map (fun x => x + 1) (Node (Node Leaf 1 Leaf) 2 (Node Leaf 3 (Node Leaf 4 Leaf)))
   = (Node (Node Leaf 2 Leaf) 3 (Node Leaf 4 (Node Leaf 5 Leaf))).
+Proof. simplify; equality. Qed.
+
+
+Lemma map_list_concatenation : forall {A B : Type} (f : A -> B) (l1 l2 : list A),
+    map f (l1 ++ l2) = (map f l1) ++ (map f l2).
 Proof.
-Admitted.
+  induct l1.
+  1: simplify; equality.
+  simplify.
+  specialize IHl1 with (l2 := l2).
+  rewrite IHl1.
+  equality.
+Qed.
 
 (* [tree_map_flatten] shows that [map]
  * and [tree_map] are related by the [flatten] function.
@@ -425,7 +458,15 @@ Admitted.
 Theorem tree_map_flatten : forall {A B : Type} (f : A -> B) (t : tree A),
     flatten (tree_map f t) = map f (flatten t).
 Proof.
-Admitted.
+  induct t.
+  1: simplify; equality.
+  simplify.
+  rewrite IHt1.
+  rewrite IHt2.
+  rewrite map_list_concatenation with (f0 := f) (l1 := (flatten t1)) (l2 := d :: (flatten t2)).
+  simplify.
+  equality.
+Qed.
 
 
 (* *** Inverse functions *** *)
@@ -454,7 +495,12 @@ Definition fun_ext := @FunctionalExtensionality.functional_extensionality.
    is the inverse of the function which adds two to its argument. *)
 Example plus2minus2: inverse (fun (x: nat) => x + 2) (fun (x: nat) => x - 2).
 Proof.
-Admitted.
+  apply fun_ext.
+  intros.
+  unfold compose.
+  unfold id.
+  linear_arithmetic.
+Qed.
 
 (* On the other hand, note that the other direction does not hold, because
    if a subtraction on natural numbers underflows, it just returns 0, so
@@ -462,6 +508,12 @@ Admitted.
    so it can't have an inverse. *)
 Example minus2plus2: ~ inverse (fun (x: nat) => x - 2) (fun (x: nat) => x + 2).
 Proof.
+  unfold not.
+  unfold inverse.
+  unfold compose.
+  propositional.
+  rewrite fun_ext with (g := (fun x : nat => x - 2 + 2)) (f := id) in H.
+  (* TODO: Finish <25-02-20, shankha> *)
 Admitted.
 
 (* The identity function is the inverse of itself.
@@ -469,7 +521,13 @@ Admitted.
    type arguments explicitly, because otherwise Coq would not be able to infer them." *)
 Lemma inverse_id: forall A, inverse (@id A) (@id A).
 Proof.
-Admitted.
+  simplify.
+  apply fun_ext.
+  intros.
+  unfold id.
+  unfold compose.
+  equality.
+Qed.
 
 (* Now we can start proving interesting facts about inverse functions:
    If g is the inverse of f, then [map g] is the inverse of [map f]: *)
@@ -477,14 +535,74 @@ Lemma invert_map : forall A B (f: A -> B) (g: B -> A),
     inverse f g ->
     inverse (map f) (map g).
 Proof.
-Admitted.
+  unfold inverse.
+  simplify.
+  unfold compose.
+  apply fun_ext.
+  intros.
+  induct x.
+  1: simplify; equality.
+  simplify.
+  rewrite IHx.
+  unfold id.
+  replace (g (f a)) with ((g ∘ f) a).
+  2: { unfold compose; equality. }
+  rewrite H.
+  unfold id.
+  equality.
+Qed.
+
+Lemma selfCompose_increment_r{A: Type}: forall (f: A -> A) (n: nat),
+    selfCompose f n ∘ f = selfCompose f (S n).
+Proof.
+  simplify.
+  induct n.
+  1: { simplify. equality. }
+  simplify.
+  replace (f ∘ selfCompose f n ∘ f) with (f ∘ (selfCompose f n ∘ f)).
+  2: apply compose_assoc.
+  rewrite IHn.
+  equality.
+Qed.
+
+Lemma selfCompose_increment_l{A: Type}: forall (f: A -> A) (n: nat),
+    f ∘ selfCompose f n = selfCompose f (S n).
+Proof.  simplify. equality. Qed.
+
+Lemma selfCompose_commute{A: Type}: forall (f: A -> A) (n: nat),
+    f ∘ selfCompose f n = selfCompose f n ∘ f.
+Proof.
+  simplify.
+  rewrite selfCompose_increment_l.
+  rewrite selfCompose_increment_r.
+  equality.
+Qed.
 
 (* And here's how to invert the power function: *)
 Lemma invert_selfCompose{A: Type}: forall (f g: A -> A) (n: nat),
     inverse f g ->
     inverse (selfCompose f n) (selfCompose g n).
 Proof.
-Admitted.
+  induct n.
+  1: {
+    unfold selfCompose.
+    simplify.
+    apply inverse_id.
+  }
+  simplify.
+  apply fun_ext.
+  simplify.
+  propositional.
+  invert H0.
+  rewrite selfCompose_commute with (f0 := g).
+  replace (selfCompose g n ∘ g ∘ (f ∘ selfCompose f n)) with (selfCompose g n ∘ (g ∘ (f ∘ selfCompose f n))).
+  2: apply compose_assoc.
+  replace (g ∘ (f ∘ selfCompose f n)) with ((g ∘ f) ∘ selfCompose f n).
+  2: rewrite compose_assoc; equality.
+  replace (g ∘ f) with (id : A -> A).
+  rewrite compose_id_l.
+  equality.
+Qed.
 
 
 (** ****** Optional exercises ******  *)
