@@ -247,20 +247,67 @@ Qed.
  * Hint: it may be helpful to define an auxiliary function that inserts
  * a key and optional value into the empty trie.
  *)
+Fixpoint insert_into_empty_trie {A} (k : list bool) (v : option A)
+  : binary_trie A :=
+  match k with
+  | [] => (Node Leaf v Leaf)
+  | true :: k' => Node (insert_into_empty_trie k' v) None Leaf
+  | false :: k' => Node Leaf None (insert_into_empty_trie k' v)
+  end.
+
 Fixpoint insert {A} (k : list bool) (v : option A) (t : binary_trie A) {struct t}
-  : binary_trie A. Admitted.
+  : binary_trie A :=
+  match t with
+  | Leaf => insert_into_empty_trie k v
+  | Node l d r =>
+    match k with
+    | [] => (Node l v r)
+    | true :: k' => Node (insert k' v l) d r
+    | false :: k' => Node l d (insert k' v r)
+    end
+  end.
 
 Example insert_example1 : lookup [] (insert [] None (Node Leaf (Some 0) Leaf)) = None.
-Proof.
-Admitted.
+Proof. simplify; equality. Qed.
 
 Example insert_example2 : lookup [] (insert [true] (Some 2) (Node Leaf (Some 0) Leaf)) = Some 0.
+Proof. simplify; equality. Qed.
+
+Theorem lookup_insert_into_empty_trie {A} (k : list bool) (v : option A) :
+  lookup k (insert_into_empty_trie k v) = v.
 Proof.
-Admitted.
+  induct k.
+  1: simplify; trivial.
+  simplify.
+  cases a.
+  1: {
+    simplify.
+    rewrite IHk.
+    equality.
+  }
+  simplify.
+  rewrite IHk.
+  equality.
+Qed.
 
 Theorem lookup_insert {A} (k : list bool) (v : option A) (t : binary_trie A) :
   lookup k (insert k v t) = v.
 Proof.
+  induct t.
+  (*cases t.*)
+  1: {
+    unfold insert.
+    apply lookup_insert_into_empty_trie.
+  }
+  induct k.
+  1: simplify; equality.
+  intros.
+  cases a.
+  1: {
+    simplify.
+    (* TODO: Finish this! <24-02-20, shankha> *)
+    invert IHt1.
+
 Admitted.
 
 
