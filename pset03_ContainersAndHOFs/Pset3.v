@@ -294,14 +294,12 @@ Theorem lookup_insert {A} (k : list bool) (v : option A) (t : binary_trie A) :
   lookup k (insert k v t) = v.
 Proof.
   induct t.
-  (*cases t.*)
   1: {
     unfold insert.
     apply lookup_insert_into_empty_trie.
   }
   induct k.
   1: simplify; equality.
-  intros.
   cases a.
   1: {
     simplify.
@@ -334,17 +332,29 @@ Notation " g ∘ f " := (compose g f) (at level 40, left associativity).
 Lemma compose_id_l : forall A B (f: A -> B),
     id ∘ f = f.
 Proof.
-Admitted.
+  simplify.
+  unfold compose.
+  unfold id.
+  trivial.
+Qed.
 
 Lemma compose_id_r : forall A B (f: A -> B),
     f ∘ id = f.
 Proof.
-Admitted.
+  simplify.
+  unfold compose.
+  unfold id.
+  trivial.
+Qed.
 
 Lemma compose_assoc : forall A B C D (f: A -> B) (g: B -> C) (h: C -> D),
     h ∘ (g ∘ f) = h ∘ g ∘ f.
 Proof.
-Admitted.
+  simplify.
+  unfold compose.
+  unfold id.
+  trivial.
+Qed.
 
 (* The selfCompose function takes a function and applies this function n times
    to the argument. There are different ways of defining it, but let's
@@ -364,14 +374,15 @@ Example selfCompose_plus1: selfCompose (plus 2) 7 3 = 17. Proof. equality. Qed.
    saying "to raise [base] to the power [e], apply the function which multiplies
    its argument by [base] to [1] [e] times".
    Define [exp] using [selfCompose] and [Nat.mul]. *)
-Definition exp(base e: nat): nat. Admitted.
+Definition exp(base e: nat): nat := selfCompose (Nat.mul base) e 1.
 
 (* Once you define [exp], you can replace [Admitted.] below by [Proof. equality. Qed.] *)
-Lemma test_exp_2_3: exp 2 3 = 8. Admitted.
-Lemma test_exp_3_2: exp 3 2 = 9. Admitted.
-Lemma test_exp_4_1: exp 4 1 = 4. Admitted.
-Lemma test_exp_5_0: exp 5 0 = 1. Admitted.
-Lemma test_exp_1_3: exp 1 3 = 1. Admitted.
+Lemma test_exp_2_3: exp 2 3 = 8. Proof. equality. Qed.
+Lemma test_exp_3_2: exp 3 2 = 9. Proof. equality. Qed.
+Lemma test_exp_4_1: exp 4 1 = 4. Proof. equality. Qed.
+Lemma test_exp_5_0: exp 5 0 = 1. Proof. equality. Qed.
+Lemma test_exp_1_3: exp 1 3 = 1. Proof. equality. Qed.
+    (* TODO: Finish this! <24-02-20, shankha> *)
 
 (* And here's another example to illustrate [selfCompose], make sure you understand
    why its result is 256. *)
