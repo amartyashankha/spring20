@@ -382,7 +382,6 @@ Lemma test_exp_3_2: exp 3 2 = 9. Proof. equality. Qed.
 Lemma test_exp_4_1: exp 4 1 = 4. Proof. equality. Qed.
 Lemma test_exp_5_0: exp 5 0 = 1. Proof. equality. Qed.
 Lemma test_exp_1_3: exp 1 3 = 1. Proof. equality. Qed.
-    (* TODO: Finish this! <24-02-20, shankha> *)
 
 (* And here's another example to illustrate [selfCompose], make sure you understand
    why its result is 256. *)
@@ -394,6 +393,7 @@ Example selfCompose_square: selfCompose (fun (x: nat) => x * x) 3 2 = 256. Proof
 Theorem map_id : forall {A : Type} (xs : list A),
     map id xs = xs.
 Proof.
+    (* TODO: Finish this! <24-02-20, shankha> *)
 Admitted.
 
 (* If we map the composition of two functions over the list,
