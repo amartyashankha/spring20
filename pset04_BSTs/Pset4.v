@@ -187,15 +187,142 @@ Ltac use_bst_iff_assumption :=
    containing two "match" expressions that returns the original
    tree in cases where the expected structure is not present. *)
 
-Definition rotate (T : tree) : tree. Admitted.
+Definition rotate (T : tree) : tree :=
+  match T with
+  | Leaf => T
+  | Node v lt rt =>
+    match lt with
+    | Leaf => T
+    | Node lv llt lrt => Node lv llt (Node v lrt rt)
+    end
+  end.
 Lemma bst_rotate T s (H : bst T s) : bst (rotate T) s.
-Proof. Admitted.
+Proof.
+  cases T. simplify.
+  1: { apply H with (x := x). }
+  remember T1 as Tl.
+  remember T2 as Tr.
+  cases Tl.
+  1: { simplify. assumption. }
+  remember d as v.
+  remember d0 as vl.
+  remember Tl1 as Tll.
+  remember Tl2 as Tlr.
+  simplify.
+  propositional.
+  1: { use_bst_iff_assumption. propositional. linear_arithmetic. }
+  1: { use_bst_iff_assumption. propositional. }
+  use_bst_iff_assumption.
+  propositional.
+  linear_arithmetic.
+Qed.
 (* there is a hint on the class website that completely gives away the proofs
  * of these rotations. We recommend you study that code after completing this
  * exercise to see how we did it, and maybe pick up a trick or two to use below. *)
 
+Lemma member_bst_imediate_node : forall a lt rt, member a (Node a lt rt) = true.
+Proof.
+  simplify.
+  cases (compare a a).
+  1: linear_arithmetic.
+  1: trivial.
+  linear_arithmetic.
+Qed.
+
 Lemma member_bst : forall tr s a, bst tr s -> member a tr = true <-> s a.
-Proof. Admitted.
+Proof.
+  simplify.
+  induct tr.
+  1: {
+    unfold member.
+    propositional.
+    1: equality.
+    unfold bst in H.
+    specialize H with (x := a).
+    equality.
+  }
+  cases (member a tr1).
+  1: {
+    remember (fun x : t => s x /\ x < d) as s'.
+    propositional.
+    1: {
+      simplify.
+      specialize (IHtr1 s' a).
+      subst.
+      propositional.
+    }
+    assert (bst tr1 s').
+    1: {
+      simplify.
+      propositional.
+      subst.
+      assumption.
+    }
+    assert (a < d).
+    1: {
+      specialize (IHtr1 s' a).
+      propositional.
+      rewrite Heqs' in H2.
+      linear_arithmetic.
+    }
+    simplify.
+    cases (compare a d).
+    1: assumption.
+    1: trivial.
+    linear_arithmetic.
+  }
+  cases (member a tr2).
+  1: {
+    remember (fun x : t => s x /\ d < x) as s'.
+    propositional.
+    1: {
+      simplify.
+      specialize (IHtr2 s' a).
+      subst.
+      propositional.
+    }
+    assert (bst tr2 s').
+    1: {
+      simplify.
+      propositional.
+      subst.
+      assumption.
+    }
+    assert (d < a).
+    1: {
+      specialize (IHtr2 s' a).
+      propositional.
+      rewrite Heqs' in H2.
+      linear_arithmetic.
+    }
+    simplify.
+    cases (compare a d).
+    3: assumption.
+    2: trivial.
+    linear_arithmetic.
+  }
+  simplify.
+  cases (compare a d).
+  1: {
+    remember (fun x : t => s x /\ x < d) as s'.
+    propositional.
+    1: equality.
+    specialize (IHtr1 s' a).
+    subst s'.
+    propositional.
+  }
+  2: {
+    remember (fun x : t => s x /\ d < x) as s'.
+    propositional.
+    1: equality.
+    specialize (IHtr2 s' a).
+    subst s'.
+    propositional.
+  }
+  subst.
+  propositional.
+Qed.
+
 
 Lemma bst_insert : forall tr s a, bst tr s ->
   bst (insert a tr) (fun x => s x \/ x = a).
