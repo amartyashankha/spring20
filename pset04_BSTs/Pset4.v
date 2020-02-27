@@ -394,6 +394,87 @@ Qed.
    the lemmas you prove about one function need to specify everything a caller
    would need to know about this function. *)
 
+Lemma bst_rightmost_right_tree_leaf : forall v Tl Tr s, bst (Node v Tl Tr) s ->
+  Tr = Leaf -> bst (Node v Tl Tr) (fun x => s x /\ ~ v < x).
+Proof.
+  propositional.
+  cases (rightmost Tr).
+  1: {
+    invert Heq.
+    simplify.
+    equality.
+  }
+  cases Tr.
+  2: equality.
+  1: {
+    invert H.
+    propositional.
+    use_bst_iff H.
+    assert (forall x, v < x -> ~ s x).
+    1: {
+      intros.
+      unfold bst in H3.
+      specialize (H3 x).
+      propositional.
+    }
+    1: {
+      simplify.
+      propositional.
+      (* TODO: WIP <27-02-20, shankha> *)
+  intros.
+  simplify.
+  subst.
+  invert Heq.
+  simplify.
+  replace (rightmost Tr) with (None : option t).
+  equality.
+  invert H.
+  simplify.
+  invert H.
+  equality.
+Qed.
+
+Lemma bst_rightmost : forall T s r, bst T s ->
+  rightmost T = Some r ->
+  bst T (fun x => s x /\ ~ r < x).
+Proof.
+  simplify.
+  induct T.
+  1: unfold rightmost in H0. equality.
+  cases (rightmost T2).
+  2: {
+    cases T2.
+    2: {
+      unfold rightmost in Heq.
+      simplify.
+  1: {
+    (*cases tr2.*)
+    (*1: invert Heq.*)
+    invert H.
+    propositional.
+    use_bst_iff H3.
+    remember (fun x : t => s x /\ d < x) as s'.
+    remember n as rr. subst n.
+    specialize (IHtr2 s' rr).
+    propositional.
+    1: {
+    use_bst_iff H4.
+    1: {
+      unfold bst.
+
+    unfold rightmost in H0.
+    replace d with r.
+    2: { invert H0. linear_arithmetic. }
+    invert H0.
+    use_bst_iff H.
+    1: { invert H0. assumption. }
+    invert H0.
+    intros.
+    cases (r <? x).
+
+
+  use_bst_iff H.
+
 Lemma bst_delete : forall tr s a, bst tr s ->
   bst (delete a tr) (fun x => s x /\ x <> a).
 Proof. Admitted.
