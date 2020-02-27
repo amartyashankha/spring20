@@ -210,9 +210,15 @@ Proof.
   remember Tl2 as Tlr.
   simplify.
   propositional.
-  1: { use_bst_iff_assumption. propositional. linear_arithmetic. }
-  1: { use_bst_iff_assumption. propositional. }
-  use_bst_iff_assumption.
+  1: {
+    use_bst_iff H1.
+    propositional. linear_arithmetic.
+  }
+  1: {
+    use_bst_iff H5.
+    propositional.
+  }
+  use_bst_iff H2.
   propositional.
   linear_arithmetic.
 Qed.
@@ -326,7 +332,55 @@ Qed.
 
 Lemma bst_insert : forall tr s a, bst tr s ->
   bst (insert a tr) (fun x => s x \/ x = a).
-Proof. Admitted.
+Proof.
+  simplify.
+  induct tr.
+  1: simplify; propositional; specialize (H x); propositional; linear_arithmetic.
+  simplify.
+  propositional.
+  cases (compare a d).
+  1: {
+    remember (fun x : t => s x /\ x < d) as s'.
+    simplify.
+    propositional.
+    1: {
+      specialize ((IHtr1 s') a).
+      propositional.
+      use_bst_iff H1.
+      subst.
+      propositional.
+      linear_arithmetic.
+    }
+    use_bst_iff H2.
+    intros.
+    propositional.
+    subst.
+    linear_arithmetic.
+  }
+  2: {
+    remember (fun x : t => s x /\ d < x) as s'.
+    simplify.
+    propositional.
+    2: {
+      specialize ((IHtr2 s') a).
+      propositional.
+      use_bst_iff H1.
+      subst.
+      propositional.
+      linear_arithmetic.
+    }
+    use_bst_iff H.
+    intros; propositional; subst; linear_arithmetic.
+  }
+  simplify.
+  propositional.
+  1: {
+    use_bst_iff H.
+    intros; propositional; subst; linear_arithmetic.
+  }
+  use_bst_iff H2.
+  intros; propositional; subst; linear_arithmetic.
+Qed.
 
 (* To prove [bst_delete], you will need to write specifications for its helper
    functions, find suitable statements for proving correctness by induction, and use
