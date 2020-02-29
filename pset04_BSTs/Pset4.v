@@ -527,7 +527,6 @@ Qed.
 
 Lemma bst_merge_ordered : forall tl tr (sl : t -> Prop) (sr : t -> Prop) dv,
   rightmost tl = Some dv ->
-  (*(forall x, sl x -> x < dv) ->*)
   (forall x, sr x -> dv < x) ->
   bst tl sl -> bst tr sr ->
   bst (merge_ordered tl tr) (fun x => sl x \/ sr x).
@@ -568,16 +567,9 @@ Proof.
   specialize (H0 x); propositional.
   specialize bst_rightmost with (t := tl) (s := sl) (rv := dv) as HH; try assumption.
   propositional.
-
-    cases (sl x).
-    propositional.
-    (*remember n as rv.*)
-    (*replace (rightmost tl) with (Some rv).*)
-    (*assert*)
-      (*s d /\*)
-      (*bst l (fun x => s x /\ x < d) /\*)
-      (*bst r (fun x => s x /\ d < x)*)
-Admitted.
+  apply member_bst with (a := x) (s := sl) in H1; propositional; try assumption.
+  apply member_bst with (a := x) (s := (fun x : t => sl x /\ (dv < x -> False))) in H6; propositional; try assumption.
+Qed.
 
 Lemma bst_delete : forall tr s a, bst tr s ->
   bst (delete a tr) (fun x => s x /\ x <> a).
@@ -585,45 +577,69 @@ Proof.
   induct tr.
   1: simplify. specialize (H x). propositional.
   intros.
+  cases (compare a d).
   1: {
     simplify.
-    cases (compare a d).
-    1: {
-      simplify.
-      propositional.
-      1: linear_arithmetic.
-      2: {
-        use_bst_iff H2.
-        propositional.
-        linear_arithmetic.
-      }
-      specialize (IHtr1 (fun x : t => s x /\ x < d) a).
-      propositional.
-      use_bst_iff H1.
-      propositional.
-    }
-    2: {
-      simplify.
-      propositional.
-      1: linear_arithmetic.
-      1: {
-        use_bst_iff H.
-        propositional.
-        linear_arithmetic.
-      }
-      specialize (IHtr2 (fun x : t => s x /\ d < x) a).
-      propositional.
-      use_bst_iff H1.
-      propositional.
-    }
     propositional.
-    assert (bst (merge_ordered tr1 tr2) (fun x : t => s x /\ x < d \/ s x /\ d < x)).
-    1: apply bst_merge_ordered with (rv := d); assumption.
+    cases (compare a d); simplify; try linear_arithmetic.
+    propositional.
+    1: linear_arithmetic.
+    2: {
+      use_bst_iff H2.
+      propositional.
+      linear_arithmetic.
+    }
+    specialize (IHtr1 (fun x : t => s x /\ x < d) a).
+    propositional.
+    use_bst_iff H1.
+    propositional.
+  }
+  2: {
+    simplify.
+    propositional.
+    cases (compare a d); simplify; try linear_arithmetic.
+    propositional.
+    1: linear_arithmetic.
+    1: {
+      use_bst_iff H.
+      propositional.
+      linear_arithmetic.
+    }
+    specialize (IHtr2 (fun x : t => s x /\ d < x) a).
+    propositional.
+    use_bst_iff H1.
+    propositional.
+  }
+  subst.
+  propositional.
+  cases (rightmost tr1).
+  2: {
+    simplify; propositional.
+    cases (compare d d); try linear_arithmetic.
+    unfold merge_ordered.
+    rewrite Heq.
     use_bst_iff_assumption.
-    intros.
     propositional; try linear_arithmetic.
-    subst.
-    cases (compare x d); propositional.
+    assert (member x tr1 = false).
+    1: apply bst_rightmost_none with (s := (fun x : t => s x /\ x < d)); try assumption.
+    apply member_bst with (a := x) in H.
+    propositional.
+    cases (compare d x); propositional; try equality.
+  }
+  replace (delete d (Node d tr1 tr2)) with (merge_ordered tr1 tr2).
+  2: simplify; cases (compare d d); try linear_arithmetic; try equality.
+  invert H; propositional.
+  apply bst_rightmost_member with (s := (fun x : t => s x /\ x < d)) in Heq as Heq'; try assumption.
+  apply member_bst with (a := n) in H as H'; propositional.
+  specialize bst_merge_ordered with (tl := tr1) (tr := tr2) (dv := n) (sl := (fun x : t => s x /\ x < d)) (sr := (fun x : t => s x /\ d < x)) as HH.
+  rewrite Heq in HH; propositional.
+  assert (forall x : t, s x /\ d < x -> n < x).
+  1: intros. linear_arithmetic.
+  propositional.
+  use_bst_iff_assumption.
+  intros.
+  propositional; try linear_arithmetic.
+  cases (compare x d); propositional.
 Qed.
 
 (* Great job! Now you have proven all tree-structure-manipulating operations
