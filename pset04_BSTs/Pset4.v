@@ -226,14 +226,14 @@ Qed.
  * of these rotations. We recommend you study that code after completing this
  * exercise to see how we did it, and maybe pick up a trick or two to use below. *)
 
-Lemma member_bst_imediate_node : forall a lt rt, member a (Node a lt rt) = true.
-Proof.
-  simplify.
-  cases (compare a a).
-  1: linear_arithmetic.
-  1: trivial.
-  linear_arithmetic.
-Qed.
+(*Lemma member_bst_imediate_node : forall a lt rt, member a (Node a lt rt) = true.*)
+(*Proof.*)
+  (*simplify.*)
+  (*cases (compare a a).*)
+  (*1: linear_arithmetic.*)
+  (*1: trivial.*)
+  (*linear_arithmetic.*)
+(*Qed.*)
 
 Lemma member_bst : forall tr s a, bst tr s -> member a tr = true <-> s a.
 Proof.
@@ -328,7 +328,6 @@ Proof.
   subst.
   propositional.
 Qed.
-
 
 Lemma bst_insert : forall tr s a, bst tr s ->
   bst (insert a tr) (fun x => s x \/ x = a).
@@ -426,24 +425,24 @@ Proof.
   subst.
   invert Heq.
   simplify.
-  replace (rightmost Tr) with (None : option t).
-  equality.
-  invert H.
-  simplify.
-  invert H.
-  equality.
-Qed.
+  (*replace (rightmost Tr) with (None : option t).*)
+  (*equality.*)
+  (*invert H.*)
+  (*simplify.*)
+  (*invert H.*)
+  (*equality.*)
+Admitted.
 
-Lemma bst_rightmost : forall T s r, bst T s ->
-  rightmost T = Some r ->
-  bst T (fun x => s x /\ ~ r < x).
+Lemma bst_rightmost : forall t s r, bst t s ->
+  rightmost t = Some r ->
+  bst t (fun x => s x /\ ~ r < x).
 Proof.
   simplify.
-  induct T.
+  induct t.
   1: unfold rightmost in H0. equality.
-  cases (rightmost T2).
+  cases (rightmost t2).
   2: {
-    cases T2.
+    cases t2.
     2: {
       unfold rightmost in Heq.
       simplify.
@@ -452,32 +451,90 @@ Proof.
     (*1: invert Heq.*)
     invert H.
     propositional.
-    use_bst_iff H3.
-    remember (fun x : t => s x /\ d < x) as s'.
-    remember n as rr. subst n.
-    specialize (IHtr2 s' rr).
-    propositional.
-    1: {
-    use_bst_iff H4.
-    1: {
-      unfold bst.
+    (*use_bst_iff H3.*)
+    (*remember (fun x : t => s x /\ d < x) as s'.*)
+    (*remember n as rr. subst n.*)
+    (*specialize (IHtr2 s' rr).*)
+    (*propositional.*)
+    (*1: {*)
+    (*use_bst_iff H4.*)
+    (*1: {*)
+      (*unfold bst.*)
 
-    unfold rightmost in H0.
-    replace d with r.
-    2: { invert H0. linear_arithmetic. }
-    invert H0.
-    use_bst_iff H.
-    1: { invert H0. assumption. }
-    invert H0.
-    intros.
-    cases (r <? x).
+    (*unfold rightmost in H0.*)
+    (*replace d with r.*)
+    (*2: { invert H0. linear_arithmetic. }*)
+    (*invert H0.*)
+    (*use_bst_iff H.*)
+    (*1: { invert H0. assumption. }*)
+    (*invert H0.*)
+    (*intros.*)
+    (*cases (r <? x).*)
+Admitted.
 
-
-  use_bst_iff H.
+Lemma bst_merge_ordered : forall tl tr (sl : t -> Prop) (sr : t -> Prop) rv,
+  (forall x : t, sl x -> x < rv) -> (forall x : t, sr x -> rv < x)
+  -> bst tl sl -> bst tr sr ->
+  bst (merge_ordered tl tr) (fun x => sl x \/ sr x).
+Proof.
+  intros.
+  cases (rightmost tl).
+  1: {
+    unfold merge_ordered.
+    (*remember n as rv.*)
+    (*replace (rightmost tl) with (Some rv).*)
+    (*assert*)
+      (*s d /\*)
+      (*bst l (fun x => s x /\ x < d) /\*)
+      (*bst r (fun x => s x /\ d < x)*)
+Admitted.
 
 Lemma bst_delete : forall tr s a, bst tr s ->
   bst (delete a tr) (fun x => s x /\ x <> a).
-Proof. Admitted.
+Proof.
+  induct tr.
+  1: simplify. specialize (H x). propositional.
+  intros.
+  1: {
+    simplify.
+    cases (compare a d).
+    1: {
+      simplify.
+      propositional.
+      1: linear_arithmetic.
+      2: {
+        use_bst_iff H2.
+        propositional.
+        linear_arithmetic.
+      }
+      specialize (IHtr1 (fun x : t => s x /\ x < d) a).
+      propositional.
+      use_bst_iff H1.
+      propositional.
+    }
+    2: {
+      simplify.
+      propositional.
+      1: linear_arithmetic.
+      1: {
+        use_bst_iff H.
+        propositional.
+        linear_arithmetic.
+      }
+      specialize (IHtr2 (fun x : t => s x /\ d < x) a).
+      propositional.
+      use_bst_iff H1.
+      propositional.
+    }
+    propositional.
+    assert (bst (merge_ordered tr1 tr2) (fun x : t => s x /\ x < d \/ s x /\ d < x)).
+    1: apply bst_merge_ordered with (rv := d); assumption.
+    use_bst_iff_assumption.
+    intros.
+    propositional; try linear_arithmetic.
+    subst.
+    cases (compare x d); propositional.
+Qed.
 
 (* Great job! Now you have proven all tree-structure-manipulating operations
    necessary to implement a balanced binary search tree. Rebalancing heuristics
