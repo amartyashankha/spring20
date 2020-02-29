@@ -83,17 +83,16 @@ Fixpoint insert (a: t) (tr: tree) : tree :=
 
 (* Helper functions for [delete] below. The *main task* in this pset
    is to understand, specify, and prove these helpers. *)
+Definition is_leaf (tr : tree) : bool :=
+  match tr with Leaf => true | _ => false end.
 Fixpoint rightmost (tr: tree) : option t :=
   match tr with
   | Leaf => None
   | Node v _ rt =>
-    match rightmost rt with
-    | None => Some v
-    | r => r
-    end
+    if is_leaf rt
+    then Some v
+    else rightmost rt
   end.
-Definition is_leaf (tr : tree) : bool :=
-  match tr with Leaf => true | _ => false end.
 Fixpoint delete_rightmost (tr: tree) : tree :=
   match tr with
   | Leaf => Leaf
@@ -393,94 +392,185 @@ Qed.
    the lemmas you prove about one function need to specify everything a caller
    would need to know about this function. *)
 
-Lemma bst_rightmost_right_tree_leaf : forall v Tl Tr s, bst (Node v Tl Tr) s ->
-  Tr = Leaf -> bst (Node v Tl Tr) (fun x => s x /\ ~ v < x).
+Lemma bst_rightmost_is_leaf : forall t, is_leaf t = true <-> rightmost t = None.
 Proof.
-  propositional.
-  cases (rightmost Tr).
-  1: {
-    invert Heq.
-    simplify.
-    equality.
-  }
-  cases Tr.
-  2: equality.
-  1: {
-    invert H.
-    propositional.
-    use_bst_iff H.
-    assert (forall x, v < x -> ~ s x).
-    1: {
-      intros.
-      unfold bst in H3.
-      specialize (H3 x).
-      propositional.
-    }
-    1: {
-      simplify.
-      propositional.
-      (* TODO: WIP <27-02-20, shankha> *)
   intros.
+  induct t; simplify; try equality.
+  propositional; try equality.
+  cases (is_leaf t2); try equality.
+Qed.
+Lemma bst_rightmost_none : forall t s x, bst t s ->
+  rightmost t = None -> member x t = false.
+Proof.
+  intros.
+  induct t.
+  1: simplify; equality.
+  invert H0.
+  cases (is_leaf t2); try equality.
+  apply bst_rightmost_is_leaf with (t := t2) in H2.
+  equality.
+Qed.
+Lemma bst_rightmost_member : forall t s rv, bst t s ->
+  rightmost t = Some rv -> member rv t = true.
+Proof.
+  intros.
+  induct t.
+  1: simplify. equality.
+  cases (is_leaf t2).
+  1: {
+    simplify.
+    rewrite Heq in H0.
+    invert H0.
+    cases (compare rv rv); try equality; try linear_arithmetic.
+  }
   simplify.
-  subst.
-  invert Heq.
-  simplify.
-  (*replace (rightmost Tr) with (None : option t).*)
-  (*equality.*)
-  (*invert H.*)
-  (*simplify.*)
-  (*invert H.*)
-  (*equality.*)
-Admitted.
+  rewrite Heq in H0.
+  propositional.
+  specialize (IHt2 (fun x : t => s x /\ d < x) rv).
+  propositional.
+  (*assert (d < rv).*)
+  assert(member rv t2 = true <-> s rv /\ d < rv).
+  1: {
+    apply member_bst with (tr := t2) (s := (fun x : t => s x /\ d < x)) (a := rv).
+    assumption.
+  }
+  apply H2 in H4.
+  propositional.
+  cases (compare rv d); try linear_arithmetic; try equality.
+Qed.
 
-Lemma bst_rightmost : forall t s r, bst t s ->
-  rightmost t = Some r ->
-  bst t (fun x => s x /\ ~ r < x).
+Lemma bst_rightmost : forall t s rv, bst t s ->
+  rightmost t = Some rv -> bst t (fun x => s x /\ ~ rv < x).
 Proof.
   simplify.
   induct t.
   1: unfold rightmost in H0. equality.
-  cases (rightmost t2).
-  2: {
-    cases t2.
-    2: {
-      unfold rightmost in Heq.
-      simplify.
+  cases (is_leaf t2).
   1: {
-    (*cases tr2.*)
-    (*1: invert Heq.*)
-    invert H.
+    simplify.
+    invert H0.
+    cases t2.
+    2: invert Heq.
     propositional.
-    (*use_bst_iff H3.*)
-    (*remember (fun x : t => s x /\ d < x) as s'.*)
-    (*remember n as rr. subst n.*)
-    (*specialize (IHtr2 s' rr).*)
-    (*propositional.*)
-    (*1: {*)
-    (*use_bst_iff H4.*)
-    (*1: {*)
-      (*unfold bst.*)
+    1: invert H2. linear_arithmetic.
+    1: use_bst_iff_assumption. propositional. invert H2. linear_arithmetic.
+    simplify.
+    specialize (H3 x).
+    propositional.
+  }
+  propositional.
+  invert H0.
+  rewrite Heq in H2.
+  invert H.
+  propositional.
+  specialize bst_rightmost_member with (t := t2) (s := (fun x : t => s x /\ d < x)) (rv := rv).
+  propositional.
+  apply member_bst with (tr := t2) (s := (fun x : t => s x /\ d < x)) (a := rv) in H1; try assumption.
+  simplify.
+  propositional; try linear_arithmetic.
+  2: {
+    specialize (IHt2 (fun x : t => s x /\ d < x) rv); propositional.
+    use_bst_iff_assumption.
+    simplify; propositional; linear_arithmetic.
+  }
+  use_bst_iff_assumption.
+  simplify; propositional; linear_arithmetic.
+Qed.
 
-    (*unfold rightmost in H0.*)
-    (*replace d with r.*)
-    (*2: { invert H0. linear_arithmetic. }*)
-    (*invert H0.*)
-    (*use_bst_iff H.*)
-    (*1: { invert H0. assumption. }*)
-    (*invert H0.*)
+Lemma bst_delete_rightmost : forall t s rv, bst t s ->
+  rightmost t = Some rv -> bst (delete_rightmost t) (fun x => s x /\ x < rv).
+Proof.
+  intros.
+  induct t. simplify; try equality.
+  cases (is_leaf t2).
+  1: {
+    invert H0.
+    rewrite Heq in H2.
+    invert H2.
+    replace (delete_rightmost (Node rv t1 t2)) with t1.
+    2: unfold delete_rightmost; rewrite Heq; equality.
+    invert H; propositional.
+    (*use_bst_iff_assumption.*)
     (*intros.*)
-    (*cases (r <? x).*)
-Admitted.
+    (*propositional; try linear_arithmetic.*)
+    (*unfold delete_rightmost.*)
+    (*assert (member x t2 = false).*)
+    (*1: {*)
+      (*apply bst_rightmost_is_leaf in Heq.*)
+      (*apply bst_rightmost_none with (s := (fun x : t => s x /\ rv < x)) (x := x) in Heq; assumption.*)
+    (*}*)
+    (*cases (compare rv x).*)
+    (*1: {*)
+      (*assert (member x t2 = true); try apply member_bst with (tr := t2) (s := (fun x : t => s x /\ rv < x)) (a := x);*)
+      (*propositional; try linear_arithmetic; try equality.*)
+    (*}*)
+    (*equality.*)
+    (*equality.*)
+  }
+  invert H0.
+  rewrite Heq in H2.
+  invert H; propositional.
+  specialize (IHt2 (fun x : t => s x /\ d < x) rv); propositional.
+  replace (delete_rightmost (Node rv t1 t2)) with (Node rv t1 (delete_rightmost t2)).
+  2: unfold delete_rightmost; rewrite Heq; equality.
+  simplify.
+  rewrite Heq.
+  assert (member rv t2 = true).
+  1: {
+    specialize bst_rightmost_member with (t := t2) (s := (fun x : t => s x /\ d < x)) (rv := rv) as HH.
+    propositional.
+  }
+  assert (d < rv).
+  1: rewrite member_bst with (s := (fun x : t => s x /\ d < x)) in H1; propositional.
+  simplify; propositional; try linear_arithmetic; try use_bst_iff_assumption; propositional; linear_arithmetic.
+Qed.
 
-Lemma bst_merge_ordered : forall tl tr (sl : t -> Prop) (sr : t -> Prop) rv,
-  (forall x : t, sl x -> x < rv) -> (forall x : t, sr x -> rv < x)
-  -> bst tl sl -> bst tr sr ->
+Lemma bst_merge_ordered : forall tl tr (sl : t -> Prop) (sr : t -> Prop) dv,
+  rightmost tl = Some dv ->
+  (*(forall x, sl x -> x < dv) ->*)
+  (forall x, sr x -> dv < x) ->
+  bst tl sl -> bst tr sr ->
   bst (merge_ordered tl tr) (fun x => sl x \/ sr x).
 Proof.
   intros.
-  cases (rightmost tl).
+  cases (rightmost tl); invert H.
+  (*2: {*)
+    (*unfold merge_ordered.*)
+    (*cases (rightmost tl); try equality.*)
+    (*use_bst_iff_assumption.*)
+    (*intros.*)
+    (*assert (member x tl = false); try apply bst_rightmost_none with (s := sl); try assumption.*)
+    (*invert H3.*)
+    (*specialize member_bst with (s := sl) (a := x) (tr := tl) as H6; propositional; try equality.*)
+  (*}*)
+  unfold merge_ordered.
+  cases (rightmost tl); try equality.
+  invert Heq.
+
+  assert (bst (delete_rightmost tl) (fun x : t => sl x /\ x < dv)).
+  apply bst_delete_rightmost; assumption.
+  simplify; propositional.
   1: {
-    unfold merge_ordered.
+    left.
+    assert (member dv tl = true).
+    apply bst_rightmost_member with (s := sl); assumption.
+    rewrite member_bst with (a := dv) (s := sl) in H3; try assumption.
+  }
+  1: {
+    use_bst_iff_assumption.
+    propositional.
+    exfalso.
+    specialize (H0 x); propositional.
+    linear_arithmetic.
+  }
+  use_bst_iff_assumption.
+  intros.
+  specialize (H0 x); propositional.
+  specialize bst_rightmost with (t := tl) (s := sl) (rv := dv) as HH; try assumption.
+  propositional.
+
+    cases (sl x).
+    propositional.
     (*remember n as rv.*)
     (*replace (rightmost tl) with (Some rv).*)
     (*assert*)
