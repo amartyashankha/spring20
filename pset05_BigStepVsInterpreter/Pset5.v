@@ -113,7 +113,19 @@ Qed.
    constructor names.
 *)
 Inductive values: arith -> valuation -> nat -> Prop :=
-.
+| ValuesConst : forall v n,
+    values (Const n) v n
+| ValuesVarDefined : forall v x a,
+    v $? x = Some a
+    -> values (Var x) v a
+| ValuesVarUndefined : forall v x a,
+    v $? x = None
+    -> values (Var x) v a
+| ValuesPlus : forall e1 e2 v a1 a2 a,
+    values e1 v a1
+    -> values e2 v a2
+    -> a = a1 + a2
+    -> values (Plus e1 e2) v a.
 
 (* Note that the following alternative would also work for ValuesPlus:
 
@@ -149,19 +161,32 @@ Proof.
   (* Once you define the four constructors for "values", you can uncomment
      the script below. Make sure you understand how it relates to the proof
      tree above! *)
-  (*
+
   eapply ValuesPlus with (a1 := 2) (a2 := a - 2).
   - eapply ValuesVarDefined. simplify. equality.
   - eapply ValuesVarUndefined. simplify. equality.
   - linear_arithmetic.
-    *)
-Admitted.
+Qed.
 
 (* Now, let's prove that "interp" and "values" are equivalent: *)
 Theorem interp_to_values: forall e v a,
     interp e v a -> values e v a.
 Proof.
-Admitted.
+  induct e; simplify.
+
+  - subst. eapply ValuesConst.
+
+  - cases (v $? x); subst.
+    1: eapply ValuesVarDefined; trivial.
+    eapply ValuesVarUndefined; trivial.
+
+  - invert H. invert H0.
+    propositional.
+    specialize (IHe1 v x).
+    specialize (IHe2 v x0).
+    propositional.
+    eapply ValuesPlus with (a1 := x) (a2 := x0); trivial.
+Qed.
 
 (* To prove the other direction, we can induct on the proof tree of "values" *)
 Theorem values_to_interp: forall e v a,
