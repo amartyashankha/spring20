@@ -225,15 +225,6 @@ Qed.
  * of these rotations. We recommend you study that code after completing this
  * exercise to see how we did it, and maybe pick up a trick or two to use below. *)
 
-(*Lemma member_bst_imediate_node : forall a lt rt, member a (Node a lt rt) = true.*)
-(*Proof.*)
-  (*simplify.*)
-  (*cases (compare a a).*)
-  (*1: linear_arithmetic.*)
-  (*1: trivial.*)
-  (*linear_arithmetic.*)
-(*Qed.*)
-
 Lemma member_bst : forall tr s a, bst tr s -> member a tr = true <-> s a.
 Proof.
   simplify.
@@ -490,22 +481,6 @@ Proof.
     replace (delete_rightmost (Node rv t1 t2)) with t1.
     2: unfold delete_rightmost; rewrite Heq; equality.
     invert H; propositional.
-    (*use_bst_iff_assumption.*)
-    (*intros.*)
-    (*propositional; try linear_arithmetic.*)
-    (*unfold delete_rightmost.*)
-    (*assert (member x t2 = false).*)
-    (*1: {*)
-      (*apply bst_rightmost_is_leaf in Heq.*)
-      (*apply bst_rightmost_none with (s := (fun x : t => s x /\ rv < x)) (x := x) in Heq; assumption.*)
-    (*}*)
-    (*cases (compare rv x).*)
-    (*1: {*)
-      (*assert (member x t2 = true); try apply member_bst with (tr := t2) (s := (fun x : t => s x /\ rv < x)) (a := x);*)
-      (*propositional; try linear_arithmetic; try equality.*)
-    (*}*)
-    (*equality.*)
-    (*equality.*)
   }
   invert H0.
   rewrite Heq in H2.
