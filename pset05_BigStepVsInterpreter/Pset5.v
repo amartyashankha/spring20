@@ -193,8 +193,12 @@ Theorem values_to_interp: forall e v a,
     values e v a -> interp e v a.
 Proof.
   induct 1; (* <-- do not change this line *)
-    simplify.
-Admitted.
+    simplify; try equality.
+  - rewrite H. trivial.
+  - rewrite H. trivial.
+  - exists a1. exists a2.
+    propositional.
+Qed.
 
 (* Note that we could also induct on e, but this is a bit more work
    (let's still do it as an exercise, though). *)
@@ -202,8 +206,15 @@ Theorem values_to_interp_induction_on_e: forall e v a,
     values e v a -> interp e v a.
 Proof.
   induct e; (* <-- BAD, but for the sake of the exercise, do not change this line *)
-    simplify.
-Admitted.
+    simplify; invert H; trivial.
+  - rewrite H1; try equality.
+  - rewrite H1; trivial.
+  - specialize (IHe1 v a1).
+    specialize (IHe2 v a2).
+    propositional.
+    exists a1. exists a2.
+    propositional.
+Qed.
 
 (* Let's define nondeterministic big-step semantics for evaluating a command.
    Define "eval" as an Inductive Prop such that "eval v1 c v2" means
@@ -212,7 +223,31 @@ Admitted.
    value it can step to.
    Hint: This will be quite similar to "eval" in OperationalSemantics.v! *)
 Inductive eval: valuation -> cmd -> valuation -> Prop :=
-.
+| EvalSkip : forall v,
+  eval v Skip v
+| EvalAssign : forall v x e a,
+  values e v a
+  -> eval v (Assign x e) (v $+ (x, a))
+| EvalSeq : forall v c1 v1 c2 v2,
+  eval v c1 v1
+  -> eval v1 c2 v2
+  -> eval v (Sequence c1 c2) v2
+| EvalIfTrue : forall v e then_ else_ v',
+  (exists a, values e v (S a))
+  -> eval v then_ v'
+  -> eval v (If e then_ else_) v'
+| EvalIfFalse : forall v e then_ else_ v',
+  values e v 0
+  -> eval v else_ v'
+  -> eval v (If e then_ else_) v'
+| EvalWhileTrue : forall v e body v' v'',
+  (exists a, values e v (S a))
+  -> eval v body v'
+  -> eval v' (While e body) v''
+  -> eval v (While e body) v''
+| EvalWhileFalse : forall v e body,
+  values e v 0
+  -> eval v (While e body) v.
 
 (* Before you continue your epic journey through this adventure game, I want
    to give you another tool. It's much more powerful than any combination of
@@ -245,7 +280,22 @@ Example the_answer_is_42 :=
 Lemma read_last_value: forall x v c n,
     values (Var x) (v $+ (x, c)) n -> n = c.
 Proof.
-Admitted.
+  simplify.
+  invert H.
+  - Search((_ $+ (_, _)) $? _).
+    rewrite lookup_add_eq with (k1 := x) (k2 := x) in H1; equality.
+  - rewrite lookup_add_eq with (k1 := x) (k2 := x) in H1; equality.
+Qed.
+
+
+Ltac last_value :=
+  match goal with
+    | [ H : (_ $+ (?K, _)) $? ?K = _ |- _ ] =>
+      rewrite lookup_add_eq with (k1 := K) (k2 := K) in H
+    | [ |- context[(_ $+ (?K, _)) $? ?K = _] ] =>
+      rewrite lookup_add_eq with (k1 := K) (k2 := K); try linear_arithmetic; try equality
+  end.
+Hint Extern 1 => last_value : core.
 
 (* Hint: This one is a bit boring -- it's about 30 lines of "invert", "simplify",
    "discriminate", "equality", "exfalso", "linear_arithmetic" and
@@ -257,10 +307,53 @@ Admitted.
 Theorem the_answer_is_indeed_42:
   forall v, eval $0 the_answer_is_42 v -> v $? "answer" = Some 42.
 Proof.
-Admitted.
+  intros.
+  invert H.
+  invert H5.
+  assert (exists a, values (Var "tmp") v2 (S a)).
+  - clear H6.
+    invert H3.
+    cases a.
+    1: invert H2.
+      1: {
+        invert H6.
+        invert H; last_value; equality.
+      }
+      1: {
+        invert H7.
+        invert H3.
+        exists 0.
+        econstructor.
+        auto.
+      }
+      invert H2.
+      2: {
+        exists 0.
+        econstructor.
+        specialize read_last_value with (x := "x") (v := $0) (c := S a) (n := 0) as HH.
+        propositional; equality.
+      }
+      invert H7.
+      invert H3.
+      apply read_last_value in H1.
+      apply read_last_value in H2.
+      subst; simplify.
+      remember (a + S a) as b.
+      exists b.
+      remember ($0 $+ ("x", S a)) as v'.
+      assert (S b <> 0); try equality.
+      econstructor.
+      auto.
+  - invert H6;
+    invert H9.
+    1: invert H6; auto.
+    invert H.
+    invert H0; invert H8; try equality.
+    invert H2; invert H10; invert H1; auto; try equality.
+Qed.
 
 (* Here's another example program. If we run it on a valuation which is
-   undefined for "x", it will read the undefined variable "x" to decide
+   undefined for "x", it will read the undefined variable "x" to decide$0 $+ ("x", S a)
    whether to abort the loop, so any number of loop iterations is possible. *)
 Example loop_of_unknown_length :=
   (While (Var "x") (Assign "counter" (Plus (Var "counter") (Const 1)))).
@@ -273,7 +366,20 @@ Theorem eval_loop_of_unknown_length: forall n initialCounter,
 Proof.
   unfold loop_of_unknown_length.
   induct n; simplify.
-Admitted.
+  - replace (initialCounter + 0) with initialCounter; try linear_arithmetic.
+    eapply EvalWhileFalse.
+    eapply ValuesVarUndefined.
+    simplify; equality.
+  - eapply EvalWhileTrue.
+    1: exists 0; eapply ValuesVarUndefined; simplify; equality.
+    1: econstructor; econstructor; econstructor; simplify; f_equal.
+    specialize (IHn (initialCounter + 1)).
+    replace ($0 $+ ("counter", initialCounter) $+ ("counter", initialCounter + 1))
+      with ($0 $+ ("counter", initialCounter + 1)).
+      2: maps_equal.
+    replace (initialCounter + 1 + n) with (initialCounter + S n) in IHn; try linear_arithmetic.
+    assumption.
+Qed.
 
 (* Wherever this TODO_FILL_IN is used, you should replace it with your solution *)
 Axiom TODO_FILL_IN: Prop.
@@ -303,8 +409,19 @@ Fixpoint run(fuel: nat)(v1: valuation)(c: cmd)(v2: valuation): Prop :=
       (exists r, interp e v1 r /\ r <> 0 /\ run fuel' v1 c1 v2) \/
       (interp e v1 0 /\ run fuel' v1 c2 v2)
     | While e c1 =>
-      TODO_FILL_IN
+      (exists r vmid, interp e v1 r /\ r <> 0 /\ run fuel' v1 c1 vmid /\ run fuel' vmid (While e c1) v2) \/
+      (interp e v1 0 /\ v1 = v2)
     end
+  end.
+
+Hint Extern 1 =>
+  match goal with
+    | [ H : interp ?E ?V ?A |- _ ] =>
+        apply interp_to_values with (e := E) (v := V) (a := A)
+  end.
+Hint Extern 1 =>
+  match goal with
+    | [ |- interp ?E ?V ?A ] => apply interp_to_values with (e := E) (v := V) (a := A)
   end.
 
 (* Now let's prove that "run" and "eval" are equivalent! *)
@@ -313,7 +430,56 @@ Theorem run_to_eval: forall fuel v1 c v2,
     run fuel v1 c v2 ->
     eval v1 c v2.
 Proof.
-Admitted.
+  induct fuel; intros.
+  - simplify. equality.
+  - induct c; try equality.
+    1: unfold run in H; subst; eapply EvalSkip.
+    1: {
+      unfold run in H.
+      invert H.
+      propositional.
+      subst. eapply EvalAssign.
+      auto.
+    }
+    1: {
+      invert H. propositional.
+      remember x as vmid.
+      pose proof (IHfuel v1 c1 vmid); propositional.
+      pose proof (IHfuel vmid c2 v2); propositional.
+      econstructor.
+      1: instantiate (1 := vmid); assumption.
+      assumption.
+    }
+    1: {
+      invert H; invert H0; propositional; auto.
+      1: {
+        auto. (* TODO: Why does auto not work here? <08-03-20, shankha> *)
+        apply interp_to_values with (e := e) (v := v1) (a := x) in H0.
+        econstructor.
+        1: {
+          cases x; propositional.
+          exists x.
+          assumption.
+        }
+        apply IHfuel.
+        assumption.
+      }
+      econstructor 5; auto.
+    }
+    invert H; propositional.
+    2: subst; econstructor 7; auto.
+    invert H0.
+    invert H.
+    propositional.
+    econstructor.
+    1: {
+      cases x; propositional.
+      exists x.
+      auto.
+    }
+    1: instantiate (1 := x0); auto.
+    auto.
+Qed.
 
 (* For the other direction, we could naively start proving it like this: *)
 Theorem eval_to_run: forall v1 c v2,
@@ -336,6 +502,45 @@ Definition wrun(v1: valuation)(c: cmd)(v2: valuation): Prop :=
    was quite convenient, so let's expose the same "API" for constructing proofs
    of "run" (or actually, proofs of the slightly nicer "wrun"). *)
 
+Theorem run_with_more_fuel: forall fuel v1 c v2,
+    run fuel v1 c v2 -> run (S fuel) v1 c v2.
+Proof.
+  induct fuel; intros.
+  - invert H.
+  - induct c; try eapply IHfuel with (v2 := v1); try equality.
+    1: {
+      invert H; propositional.
+      pose proof (IHfuel v1 c1 x); propositional.
+      pose proof (IHfuel x c2 v2); propositional.
+      exists x.
+      econstructor; propositional.
+    }
+    1: {
+      invert H; propositional.
+      1: {
+        invert H0; propositional.
+        apply (IHfuel v1 c1 v2) in H2.
+        econstructor.
+        exists x; propositional.
+      }
+      econstructor 2; propositional.
+      apply (IHfuel v1 c2 v2) in H1.
+      assumption.
+    }
+    invert H; propositional.
+    1: {
+      invert H0; invert H; propositional.
+      econstructor.
+      exists x.
+      exists x0.
+      propositional.
+      1: apply (IHfuel v1 c x0) in H1; assumption.
+      apply (IHfuel x0 (While e c) v2) in H3; assumption.
+    }
+    subst.
+    econstructor 2; propositional; trivial.
+Qed.
+
 (* But first, we need a helper lemma run_monotone.
    Hint: Here, some proof automation might pay off!
    You could try writing a "repeat match goal" loop, to do all possible
@@ -352,7 +557,14 @@ Lemma run_monotone: forall fuel1 fuel2 v1 c v2,
     run fuel1 v1 c v2 ->
     run fuel2 v1 c v2.
 Proof.
-Admitted.
+  induct fuel2; intros; cases fuel1; try equality; try linear_arithmetic.
+  1: invert H0.
+  invert H; try assumption.
+  specialize (IHfuel2 v1 c v2).
+  propositional.
+  apply run_with_more_fuel.
+  assumption.
+Qed.
 
 (* Now let's define proof rules to get the same "API" for "wrun" as for "eval".
    Hint: Again, some proof automation might simplify the task (but manual proofs are
