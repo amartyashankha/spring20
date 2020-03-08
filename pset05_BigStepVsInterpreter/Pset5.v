@@ -421,7 +421,7 @@ Hint Extern 1 =>
   end.
 Hint Extern 1 =>
   match goal with
-    | [ |- interp ?E ?V ?A ] => apply interp_to_values with (e := E) (v := V) (a := A)
+    | [ |- context[interp ?E ?V ?A] ] => apply interp_to_values with (e := E) (v := V) (a := A)
   end.
 
 (* Now let's prove that "run" and "eval" are equivalent! *)
@@ -570,39 +570,101 @@ Qed.
    Hint: Again, some proof automation might simplify the task (but manual proofs are
    possible too, of course). *)
 
+Ltac blah :=
+  repeat match goal with
+    | [ H : interp ?E ?V 0 |- run _ ?V (While ?E _) _ ] => econstructor 2; propositional
+    | [ H : interp ?E ?V 0 |- run _ ?V (If ?E _ _) _ ] => econstructor 2; propositional
+    | [ |- run _ _ _ _ ] => econstructor; propositional
+    | [ |- run _ _ _ _ ] => econstructor; propositional
+    | [ H : run ?F1 ?V1 ?C ?V2 |- run ?F2 ?V1 ?C ?V2 ] =>
+        apply run_monotone with (fuel1 := F1) (fuel2 := F2);
+        propositional; try linear_arithmetic; try equality
+    | [ H : run _ ?V1 ?C ?V2 |- run _ ?v1 ?C ?V2 ] => unify v1 V1
+    | [ H : run _ ?V1 ?C ?V2 |- run _ ?V1 ?C ?v2 ] => unify v2 V2
+    | [ H : run _ _ ?C1 _ |- run _ _ (Sequence ?C1 ?C2) _ ] => econstructor
+    | [ H : interp ?E ?V ?A |- interp ?E ?V ?a ] => unify a A
+  end; try eexists; propositional; try linear_arithmetic; try equality; try assumption.
+
 Lemma WRunSkip: forall v,
     wrun v Skip v.
 Proof.
-Admitted.
+  simplify; econstructor.
+  instantiate (1 := 1).
+  blah.
+Qed.
 
 Lemma WRunAssign: forall v x e a,
     interp e v a ->
     wrun v (Assign x e) (v $+ (x, a)).
 Proof.
-Admitted.
+  simplify; econstructor.
+  instantiate (1 := 1).
+  blah.
+Qed.
 
-Lemma WRunSeq: forall v c1 v1 c2 v2,
-    wrun v c1 v1 ->
-    wrun v1 c2 v2 ->
-    wrun v (Sequence c1 c2) v2.
+Lemma WRunSeq: forall v1 c1 vmid c2 v2,
+    wrun v1 c1 vmid ->
+    wrun vmid c2 v2 ->
+    wrun v1 (Sequence c1 c2) v2.
 Proof.
-Admitted.
+  simplify.
+  invert H.
+  invert H0.
+  econstructor.
+  instantiate (1 := S (x + x0)).
+  blah.
+Qed.
 
-Lemma WRunIfTrue: TODO_FILL_IN.
+Lemma WRunIfTrue: forall v e then_ else_ v',
+  (exists a, interp e v (S a))
+  -> wrun v then_ v'
+  -> wrun v (If e then_ else_) v'.
 Proof.
-Admitted.
+  simplify.
+  invert H.
+  invert H0.
+  econstructor.
+  instantiate (1 := S x0).
+  blah; blah.
+Qed.
 
-Lemma WRunIfFalse: TODO_FILL_IN.
+Lemma WRunIfFalse: forall v e then_ else_ v',
+  interp e v 0
+  -> wrun v else_ v'
+  -> wrun v (If e then_ else_) v'.
 Proof.
-Admitted.
+  simplify.
+  (*invert H.*)
+  invert H0.
+  econstructor.
+  instantiate (1 := S x).
+  blah.
+Qed.
 
-Lemma WRunWhileTrue: TODO_FILL_IN.
+Lemma WRunWhileTrue: forall v e body v' v'',
+  (exists a, interp e v (S a))
+  -> wrun v body v'
+  -> wrun v' (While e body) v''
+  -> wrun v (While e body) v''.
 Proof.
-Admitted.
+  simplify.
+  invert H.
+  invert H0.
+  invert H1.
+  econstructor.
+  instantiate (1 := S (x0 + x1)).
+  blah; blah; blah.
+Qed.
 
-Lemma WRunWhileFalse: TODO_FILL_IN.
+Lemma WRunWhileFalse: forall v e body,
+  interp e v 0
+  -> wrun v (While e body) v.
 Proof.
-Admitted.
+  simplify.
+  econstructor.
+  instantiate (1 := 1).
+  blah.
+Qed.
 
 (* Now, thanks to these helper lemmas, proving the direction from eval to wrun
    becomes easy: *)
@@ -610,6 +672,24 @@ Theorem eval_to_wrun: forall v1 c v2,
     eval v1 c v2 ->
     wrun v1 c v2.
 Proof.
+  induct c; intros.
+
+  1: invert H; apply WRunSkip.
+  1: invert H; eapply WRunAssign; try apply values_to_interp; trivial.
+  1: {
+    invert H.
+    eapply WRunSeq; try instantiate (1 := v0); try apply IHc1; try apply IHc2; admit.
+  }
+  1: {
+    repeat invert H; try eapply WRunIfTrue;
+      try exists x; try apply values_to_interp; try equality; try apply IHc2; try assumption.
+      1: invert H5; apply values_to_interp in H; exists x; assumption.
+      2: { 
+        invert H5. apply values_to_interp in H; exists x; assumption.
+    repeat invert H; try eapply WRunIfFalse; try eapply WRunIfTrue;
+      try exists x; try apply values_to_interp; try equality;
+      try apply IHc1; try apply IHc2; try assumption.
+      3: {
 Admitted.
 
 (* The following definitions are needed because of a limitation of Coq
