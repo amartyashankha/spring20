@@ -668,29 +668,36 @@ Qed.
 
 (* Now, thanks to these helper lemmas, proving the direction from eval to wrun
    becomes easy: *)
-Theorem eval_to_wrun: forall v1 c v2,
+Theorem eval_to_wrun: forall c v1 v2,
     eval v1 c v2 ->
     wrun v1 c v2.
 Proof.
-  induct c; intros.
+  induct 1.
+  1: apply WRunSkip.
+  1: eapply WRunAssign; try apply values_to_interp; trivial.
+  1: eapply WRunSeq; try instantiate (1 := v1); try apply IHc1; try apply IHc2; assumption.
 
-  1: invert H; apply WRunSkip.
-  1: invert H; eapply WRunAssign; try apply values_to_interp; trivial.
   1: {
+    eapply WRunIfTrue; trivial.
     invert H.
-    eapply WRunSeq; try instantiate (1 := v0); try apply IHc1; try apply IHc2; admit.
+    exists x; apply values_to_interp; trivial.
   }
+
   1: {
-    repeat invert H; try eapply WRunIfTrue;
-      try exists x; try apply values_to_interp; try equality; try apply IHc2; try assumption.
-      1: invert H5; apply values_to_interp in H; exists x; assumption.
-      2: { 
-        invert H5. apply values_to_interp in H; exists x; assumption.
-    repeat invert H; try eapply WRunIfFalse; try eapply WRunIfTrue;
-      try exists x; try apply values_to_interp; try equality;
-      try apply IHc1; try apply IHc2; try assumption.
-      3: {
-Admitted.
+    eapply WRunIfFalse; trivial.
+    apply values_to_interp; trivial.
+  }
+
+  1: {
+    eapply WRunWhileTrue; trivial.
+    1: invert H; exists x; apply values_to_interp; equality.
+    1: instantiate (1 := v'); apply IHeval1; trivial.
+    assumption.
+  }
+
+  eapply WRunWhileFalse; trivial.
+  apply values_to_interp; assumption.
+Qed.
 
 (* The following definitions are needed because of a limitation of Coq
    (the kernel does not recognize that a parameter can be instantiated by an
