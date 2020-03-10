@@ -668,7 +668,7 @@ Qed.
 
 (* Now, thanks to these helper lemmas, proving the direction from eval to wrun
    becomes easy: *)
-Theorem eval_to_wrun: forall c v1 v2,
+Theorem eval_to_wrun: forall v1 c v2,
     eval v1 c v2 ->
     wrun v1 c v2.
 Proof.
