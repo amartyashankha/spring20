@@ -250,18 +250,18 @@ Qed.
 
 (* Prove: one small step can be replicated with the optimized command. *)
 Lemma constfold_step : forall v c v' c', step (v, c) (v', c') ->
-  forall ss, compatible_throughout_steps ss v c ->
-    step (v, constfold_cmd c ss (fun c1 => c1)) (v', constfold_cmd c' ss (fun c1 => c1)).
+  forall ss C, compatible_throughout_steps ss v (C c) ->
+    step (v, constfold_cmd c ss C) (v', constfold_cmd c' ss C).
 Proof.
   induct 1; intros.
 
   1: {
     simplify.
-    cases (ss $? (x <- e)); eauto.
+    cases (ss $? C (x <- e)); eauto.
 
     unfold compatible_throughout_steps in H.
-    specialize (H (x <- e) a v).
-    assert ((step) ^* (v, x <- e) (v, x <- e)).
+    specialize (H (C (x <- e)) a v).
+    assert ((step) ^* (v, C (x <- e)) (v, C (x <- e))).
     1: eauto.
     remember a as s.
     propositional; eauto.
@@ -270,32 +270,12 @@ Proof.
     econstructor.
   }
   1: {
-    eassert (exists ss', compatible_throughout_steps ss' v c1).
-    1: {
-      do 1 eexists.
-      unfold compatible_throughout_steps in H0.
-      unfold compatible_throughout_steps; intros.
-      specialize (H0 (c';; c2) s v'0); propositional.
-      cases (ss $? (c';; c2)).
-
-      assert (ss $? (c';; c2) = Some s).
-      admit.
-    }
-
-    specialize (IHstep ss). propositional.
+    specialize (IHstep ss (fun c' => C (c';; c2))).
     simplify.
-    econstructor.
-
-    invert H.
-    unfold compatible_throughout_steps in H0.
-    simplify.
-    unfold compatible_throughout_steps in H0.
-    specialize (IHstep ss).
-    [>apply IHstep in H0.<]
-    admit.
+    eauto.
   }
   all: constructor; trivial.
-Admitted.
+Qed.
 
 (* Prove: any sequence of small steps can be replicated with the optimized command. *)
 Lemma constfold_steps : forall v c v' c', step^* (v, c) (v', c') ->
@@ -395,7 +375,7 @@ Qed.
 Hint Resolve merge_astates_fok_constant merge_astates_fok2_constant : core.
 
 (* This part takes ~3GB of RAM and 10 minutes on the laptop we tested with. *)
-(*
+
 Lemma loopsy_optimized_properly : forall v v',
   eval v loopsy v'
   -> eval v loopsy_optimized v'.
@@ -435,4 +415,4 @@ Proof.
   assumption.
   assumption.
 Qed.
-*)
+
