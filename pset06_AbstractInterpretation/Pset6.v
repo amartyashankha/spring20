@@ -63,8 +63,7 @@ Definition compatible a (s : astate a) (v : valuation) : Prop :=
                             /\ a.(Represents) n xa. *)
 
 (* Depending on how you approach [constant_sound], this
- * lemma may or may not be useful. Regardless, it is used in our proof of
- * [optimize_program_ok] below. *)
+ * lemma may or may not be useful. Regardless, it is used in our proof of * [optimize_program_ok] below. *)
 (* from frap/AbstractInterpret.v:
 Definition subsumed a (s1 s2 : astate a) :=
   forall x, match s1 $? x with
@@ -81,7 +80,7 @@ Proof.
   unfold compatible, subsumed; simplify.
   specialize H0 with (x:=x). cases (s1 $? x).
   apply H in Heq; first_order. equality.
-Qed. 
+Qed.
 Hint Resolve compatible_subsumed : core.
 
 Lemma constant_sound : absint_sound constant_absint.
@@ -90,7 +89,7 @@ Proof.
 
   (* You'll need to prove this one. *)
 
-  all: simplify.
+  all: simplify; try equality.
 
   (* As a convenience, here are some examples of how to
    * combine tactics using repeat-match-progress. These are not particularly
@@ -98,20 +97,42 @@ Proof.
 
   all:
     repeat match goal with
-    | x : bool |- _
-        => progress (cases x)
-    | H : Some _ = Some _ |- _
-        => progress (invert H)
-    | |- Some _ = Some _ =>
-        progress (apply f_equal)
-    | H : ?x = ?x + 1 |- _
-        => solve [linear_arithmetic]
-    | H : forall b, b = true -> _ |- _
-        => specialize (H true)
-    | _ => progress (simplify)
-    end.
+    | |- represents (_ _ _) (_ _ ?na ?ma)
+        => cases na; cases ma; simplify; try equality
+    | H : represents _ (_ _ ?na ?ma) |- _
+        => cases na; cases ma; simplify; try equality
+    | H : forall n, n = ?n0 -> _ |- _
+        => specialize (H n0); propositional
+    | H : forall n, True -> represents n ?na |- _
+        => cases na; simplify
+    | H : forall n, True -> n = ?n1 |- _
+        => specialize (H (S n1)); propositional; try linear_arithmetic
+    | |- represents _ (_ _ ?na ?ma)
+        => cases na; cases ma; simplify; try linear_arithmetic
+    | |- represents _ (join ?x ?y)
+        => cases x; cases y; simplify; subst; try equality
+    end; try equality.
 
-Admitted.
+    cases (n0 ==n n1); simplify; try equality.
+    cases (n0 ==n n1); simplify; try equality.
+
+  (*all:*)
+    (*cases n.*)
+    (*unfold represents.*)
+    (*repeat match goal with*)
+    (*| x : bool |- _*)
+        (*=> progress (cases x)*)
+    (*| H : Some _ = Some _ |- _*)
+        (*=> progress (invert H)*)
+    (*| |- Some _ = Some _ =>*)
+        (*progress (apply f_equal)*)
+    (*| H : ?x = ?x + 1 |- _*)
+        (*=> solve [linear_arithmetic]*)
+    (*| H : forall b, b = true -> _ |- _*)
+        (*=> specialize (H true)*)
+    (*| _ => progress (simplify)*)
+    (*end.*)
+Qed.
 
 
 (** * Optimizing programs based on that analysis *)
@@ -194,15 +215,110 @@ Definition compatible_throughout_steps {A} ss v c:= forall c' s v',
 (* This line makes [eauto] treat [compatible_throughout_steps] as inlined: *)
 Hint Unfold compatible_throughout_steps : core.
 
+Lemma constfold_arith_ok : forall v s e,
+  compatible s v ->
+  interp (to_arith (constfold_arith e s)) v = interp e v.
+Proof.
+  induct e; simplify; try equality;
+  repeat (match goal with
+          | [ |- context[match ?E with _ => _ end] ] => cases E
+          end; simplify); subst; try linear_arithmetic.
+
+  cases (n ==n n0); trivial.
+  unfold compatible in H.
+  specialize (H x (Exactly n)).
+  propositional.
+  invert H0.
+  propositional.
+  rewrite Heq0 in H0.
+  invert H0.
+  invert H1.
+  propositional.
+
+  cases (n ==n 0); trivial.
+  unfold compatible in H.
+  specialize (H x (Exactly n)).
+  propositional.
+  invert H0.
+  propositional.
+  rewrite Heq0 in H0.
+  invert H0.
+
+  all:
+    propositional; linear_arithmetic.
+Qed.
+
+(* Prove: one small step can be replicated with the optimized command. *)
+Lemma constfold_step : forall v c v' c', step (v, c) (v', c') ->
+  forall ss, compatible_throughout_steps ss v c ->
+    step (v, constfold_cmd c ss (fun c1 => c1)) (v', constfold_cmd c' ss (fun c1 => c1)).
+Proof.
+  induct 1; intros.
+
+  1: {
+    simplify.
+    cases (ss $? (x <- e)); eauto.
+
+    unfold compatible_throughout_steps in H.
+    specialize (H (x <- e) a v).
+    assert ((step) ^* (v, x <- e) (v, x <- e)).
+    1: eauto.
+    remember a as s.
+    propositional; eauto.
+    apply constfold_arith_ok with (e := e) in H.
+    rewrite <- H.
+    econstructor.
+  }
+  1: {
+    eassert (exists ss', compatible_throughout_steps ss' v c1).
+    1: {
+      do 1 eexists.
+      unfold compatible_throughout_steps in H0.
+      unfold compatible_throughout_steps; intros.
+      specialize (H0 (c';; c2) s v'0); propositional.
+      cases (ss $? (c';; c2)).
+
+      assert (ss $? (c';; c2) = Some s).
+      admit.
+    }
+
+    specialize (IHstep ss). propositional.
+    simplify.
+    econstructor.
+
+    invert H.
+    unfold compatible_throughout_steps in H0.
+    simplify.
+    unfold compatible_throughout_steps in H0.
+    specialize (IHstep ss).
+    [>apply IHstep in H0.<]
+    admit.
+  }
+  all: constructor; trivial.
+Admitted.
 
 (* Prove: any sequence of small steps can be replicated with the optimized command. *)
-Lemma constfold_steps : forall v c v' c',
-  step^* (v, c) (v', c') ->
+Lemma constfold_steps : forall v c v' c', step^* (v, c) (v', c') ->
   forall ss, compatible_throughout_steps ss v c ->
-  step^* (v, constfold_cmd c ss (fun c1 => c1))
-  (v', constfold_cmd c' ss (fun c1 => c1)).
+    step^* (v, constfold_cmd c ss (fun c1 => c1))
+      (v', constfold_cmd c' ss (fun c1 => c1)).
 Proof.
-Admitted.
+  induct 1; eauto.
+
+  cases y.
+  specialize (IHtrc v0 c0 v' c'); propositional.
+  assert (compatible_throughout_steps ss v0 c0).
+  1: {
+    unfold compatible_throughout_steps in H1.
+    unfold compatible_throughout_steps; intros.
+    specialize (H1 c'0 s v'0); propositional.
+    eapply TrcFront in H4; eauto.
+  }
+  specialize (H2 ss); propositional.
+  eapply TrcFront.
+  eapply constfold_step; eauto.
+  assumption.
+Qed.
 
 (* Prove: any full program execution can be replicated with the optimized program. *)
 Lemma eval_constfold : forall v c v',
@@ -210,7 +326,14 @@ Lemma eval_constfold : forall v c v',
   forall ss, compatible_throughout_steps ss v c ->
   eval v (constfold_cmd c ss (fun c1 => c1)) v'.
 Proof.
-Admitted.
+  intros.
+  eapply big_small in H.
+  eapply small_big.
+  eapply constfold_steps in H as HH; simplify.
+
+  eassumption.
+  assumption.
+Qed.
 
 (* This lemma connects the previous to the [invariantFor] goal that FRAP abstract-interpretation machinery proves. *)
 Lemma optimize_program_ok : forall v c v' ss,
