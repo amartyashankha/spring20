@@ -210,11 +210,46 @@ Inductive hasty : fmap var type -> exp -> type -> Prop :=
 
 Lemma subtype_refl : forall t1, t1 $<: t1.
 Proof.
-Admitted.
+  induct t1; econstructor; assumption.
+Qed.
+
+Lemma subtype_trans_aux : forall t1 t2, t1 $<: t2 ->
+ forall t3, (t2 $<: t3 -> t1 $<: t3) /\ (t3 $<: t1 -> t3 $<: t2).
+Proof.
+  induct 1; intros.
+  2: propositional; cases t2; cases t3; invert H; invert H0; econstructor.
+  2: {
+    cases t2; propositional; try invert H; try econstructor.
+  }
+  2: {
+    propositional.
+    1: {
+      invert H1; try econstructor.
+      1: specialize (IHsubtype1 t0); propositional.
+      specialize (IHsubtype2 t4); propositional.
+    }
+    invert H1; try econstructor.
+    1: specialize (IHsubtype1 t1'0); propositional.
+    specialize (IHsubtype2 t2'0); propositional.
+  }
+  propositional.
+  1: {
+    invert H1.
+    econstructor.
+    1: specialize (IHsubtype1 t0); propositional.
+    specialize (IHsubtype2 t4); propositional.
+  }
+  invert H1.
+  econstructor.
+  1: specialize (IHsubtype1 t1'0); propositional.
+  specialize (IHsubtype2 t2'0); propositional.
+Qed.
 
 Lemma subtype_trans : forall t1 t2 t3, t1 $<: t2 -> t2 $<: t3 -> t1 $<: t3.
 Proof.
-Admitted.
+  intros.
+  eapply subtype_trans_aux with (t1 := t1) (t2 := t2); assumption.
+Qed.
 
 (* BEGIN handy tactic that we suggest for these proofs *)
 Ltac tac0 :=
