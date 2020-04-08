@@ -251,6 +251,9 @@ Proof.
   eapply subtype_trans_aux with (t1 := t1) (t2 := t2); assumption.
 Qed.
 
+
+Hint Constructors value plug step0 step hasty proj_t.
+
 (* BEGIN handy tactic that we suggest for these proofs *)
 Ltac tac0 :=
   match goal with
@@ -260,6 +263,8 @@ Ltac tac0 :=
   | [ |- context[?x ==v ?y] ] => cases (x ==v y); simplify
   | [ H : step _ _ |- _ ] => invert H
   | [ H : step0 _ _ |- _ ] => invert1 H
+  (*| [ H : hasty _ ?e _, H' : value ?e |- _ ] => invert H'; invert H*)
+  (*| [ H : hasty _ ?e (Fun _ _), H' : value ?e |- _ ] => apply hasty_fun in H*)
   | [ H : hasty _ _ _ |- _ ] => invert1 H
   | [ H : proj_t _ _ _ |- _ ] => invert1 H
   | [ H : plug _ _ _ |- _ ] => invert1 H
@@ -268,7 +273,7 @@ Ltac tac0 :=
   end;
   subst.
 
-Ltac tac := simplify; subst; propositional; repeat (tac0; simplify); try equality.
+Ltac tac := simplify; subst; propositional; repeat (tac0; simplify); try equality; eauto.
 (* END handy tactic *)
 
 
@@ -284,10 +289,109 @@ Ltac tac := simplify; subst; propositional; repeat (tac0; simplify); try equalit
  * This is in contrast to the *previous* psets, which we tried to design so that
  * they could be solved from scratch a with good understanding of the lecture
  * material. *)
+Lemma tuple_nil_hasty : forall G t, hasty G TupleNil t -> t = TupleTypeNil.
+Proof.
+  induct 1; try equality.
+  cases t; subst; invert H0.
+  trivial.
+Qed.
+Hint Resolve tuple_nil_hasty.
+
+Lemma tuple_cons_hasty : forall G e1 e2 t,
+  hasty G (TupleCons e1 e2) t -> t = TupleTypeNil \/ exists t1 t2, t = TupleTypeCons t1 t2.
+Proof.
+  induct 1; simplify.
+  1: right; exists t1; exists t2; equality.
+  propositional.
+  1: subst; left; invert H0; equality.
+  invert H1; invert H2.
+  rename x into t1.
+  rename x0 into t2.
+  invert H0.
+  1: left; equality.
+  right; exists t0; exists t3; equality.
+Qed.
+Hint Resolve tuple_cons_hasty.
+
+Lemma hasty_tuple_cons : forall e G t1 t2,
+  hasty G e (TupleTypeCons t1 t2) -> value e -> exists e1 e2, e = TupleCons e1 e2.
+Proof.
+  induct e; simplify; invert H0; eauto.
+  1: {
+    invert H.
+    admit.
+  }
+  admit.
+Admitted.
+Hint Resolve hasty_tuple_cons.
+
+Lemma hasty_fun : forall e1 G t1 t2,
+  hasty G e1 (Fun t1 t2) -> value e1 -> exists x e, e1 = Abs x e.
+Proof.
+  induct e1; propositional; invert H0; eauto.
+  1: apply tuple_nil_hasty in H; try equality.
+  1: {
+    apply tuple_cons_hasty in H; invert H.
+    1: invert H0.
+    invert H0. invert H. invert H0.
+  }
+Qed.
+Hint Resolve hasty_fun.
+
+Lemma tuple_nil_subtype : forall t, TupleTypeNil $<: t -> t = TupleTypeNil.
+Proof.
+  induct 1; equality.
+Qed.
+Hint Resolve tuple_nil_subtype.
+
+Lemma progress : forall e t,
+    hasty $0 e t -> value e \/ (exists e', step e e').
+Proof.
+  induct 1; simplify; try equality; propositional; tac. (*; try right; eauto.*)
+  1: {
+    apply hasty_fun in H; try assumption.
+    invert H. invert H2.
+    eauto.
+  }
+  7: {
+    invert H0; apply hasty_tuple_cons in H; try assumption.
+    1: {
+      invert H. invert H0. invert H1.
+      right.
+      exists x.
+      eapply StepRule with (C := Hole); eauto.
+    }
+    invert H. invert H0. invert H1.
+    right; exists (Proj x0 n0).
+    eapply StepRule with (C := Hole); eauto.
+  }
+  all: right; eauto.
+Qed.
+
+Lemma preservation : forall e1 e2,
+  step e1 e2 -> forall t, hasty $0 e1 t -> hasty $0 e2 t.
+Proof.
+  invert 1; simplify.
+Admitted.
+
 Theorem safety :
   forall e t,
     hasty $0 e t -> invariantFor (trsys_of e)
                                  (fun e' => value e'
                                             \/ exists e'', step e' e'').
 Proof.
-Admitted.
+  simplify.
+
+  apply invariant_weaken with (invariant1 := fun e' => hasty $0 e' t).
+
+  1: {
+    apply invariant_induction; simplify; propositional; subst; try assumption.
+    eapply preservation.
+    1: eassumption.
+    assumption.
+  }
+
+  simplify.
+  eapply progress.
+  eassumption.
+Qed.
