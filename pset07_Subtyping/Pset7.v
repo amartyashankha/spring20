@@ -11,7 +11,7 @@ Require Import Pset7Sig.
 
 (* Delete this line if you don't like bullet points and errors like
    "Expected a single focused goal but 2 goals are focused." *)
-Set Default Goal Selector "!".
+(*Set Default Goal Selector "!".*)
 Set Implicit Arguments.
 
 
@@ -212,6 +212,7 @@ Lemma subtype_refl : forall t1, t1 $<: t1.
 Proof.
   induct t1; econstructor; assumption.
 Qed.
+Hint Resolve subtype_refl.
 
 Lemma subtype_trans_aux : forall t1 t2, t1 $<: t2 ->
  forall t3, (t2 $<: t3 -> t1 $<: t3) /\ (t3 $<: t1 -> t3 $<: t2).
@@ -250,6 +251,7 @@ Proof.
   intros.
   eapply subtype_trans_aux with (t1 := t1) (t2 := t2); assumption.
 Qed.
+Hint Resolve subtype_trans.
 
 
 Hint Constructors value plug step0 step hasty proj_t.
@@ -368,11 +370,206 @@ Proof.
   all: right; eauto.
 Qed.
 
-Lemma preservation : forall e1 e2,
-  step e1 e2 -> forall t, hasty $0 e1 t -> hasty $0 e2 t.
-Proof.
-  invert 1; simplify.
-Admitted.
+(*BEGIN COPY FROM LambdaCalculusAndTypeSoundness.v*)
+  (* Inclusion between typing contexts is preserved by adding the same new mapping
+   * to both. *)
+  Lemma weakening_override : forall (G G' : fmap var type) x t,
+    (forall x' t', G $? x' = Some t' -> G' $? x' = Some t')
+    -> (forall x' t', G $+ (x, t) $? x' = Some t'
+                      -> G' $+ (x, t) $? x' = Some t').
+  Proof.
+    simplify.
+    cases (x ==v x'); simplify; eauto.
+  Qed.
+
+  (* This lemma lets us transplant a typing derivation into a new context that
+   * includes the old one. *)
+  Lemma weakening : forall G e t,
+    hasty G e t
+    -> forall G', (forall x t, G $? x = Some t -> G' $? x = Some t)
+      -> hasty G' e t.
+  Proof.
+    induct 1; simplify.
+
+    constructor.
+    apply H0.
+    assumption.
+
+    constructor.
+
+    econstructor.
+    instantiate (1 := t2).
+    apply IHhasty; simplify.
+    cases (x ==v x0); subst; simplify; try assumption.
+    apply H0; assumption.
+    eauto.
+
+    econstructor.
+    instantiate (1 := t1).
+    apply IHhasty1.
+    assumption.
+    apply IHhasty2.
+    assumption.
+
+    constructor.
+
+    constructor.
+    apply IHhasty1.
+    assumption.
+    apply IHhasty2.
+    assumption.
+
+    specialize (IHhasty G'); propositional.
+    econstructor.
+    eassumption.
+    assumption.
+
+    specialize (IHhasty G'); propositional.
+    econstructor.
+    eassumption.
+    assumption.
+  Qed.
+
+  (* Replacing a variable with a properly typed term preserves typing. *)
+  Lemma substitution : forall G x t' e t e',
+    hasty (G $+ (x, t')) e t
+    -> hasty $0 e' t'
+    -> hasty G (subst e' x e) t.
+  Proof.
+    induct 1; simplify.
+
+    cases (x0 ==v x).
+
+    simplify.
+    invert H.
+    eapply weakening.
+    eassumption.
+    simplify.
+    equality.
+
+    simplify.
+    constructor.
+    assumption.
+
+    constructor.
+
+    constructor.
+    eapply IHhasty1; equality.
+    eapply IHhasty2; equality.
+
+    cases (x0 ==v x).
+
+    constructor.
+    eapply weakening.
+    eassumption.
+    simplify.
+    cases (x0 ==v x1).
+
+    simplify.
+    assumption.
+
+    simplify.
+    assumption.
+
+    constructor.
+    eapply IHhasty.
+    maps_equal.
+    assumption.
+
+    econstructor.
+    eapply IHhasty1; equality.
+    eapply IHhasty2; equality.
+  Qed.
+
+  (* We're almost ready for the other main property.  Let's prove it first
+   * for the more basic [step0] relation: steps preserve typing. *)
+  Lemma preservation0 : forall e1 e2,
+    step0 e1 e2
+    -> forall t, hasty $0 e1 t
+      -> hasty $0 e2 t.
+  Proof.
+    invert 1; simplify.
+
+    invert H.
+    invert H4.
+    eapply substitution.
+    eassumption.
+    assumption.
+
+    invert H.
+    constructor.
+  Qed.
+
+  (* We also need this key property, essentially saying that, if [e1] and [e2] are
+   * "type-equivalent," then they remain "type-equivalent" after wrapping the same
+   * context around both. *)
+  Lemma generalize_plug : forall e1 C e1',
+    plug C e1 e1'
+    -> forall e2 e2', plug C e2 e2'
+      -> (forall t, hasty $0 e1 t -> hasty $0 e2 t)
+      -> (forall t, hasty $0 e1' t -> hasty $0 e2' t).
+  Proof.
+    induct 1; simplify.
+
+    invert H.
+    apply H0.
+    assumption.
+
+    invert H0.
+    invert H2.
+    constructor.
+    eapply IHplug.
+    eassumption.
+    assumption.
+    assumption.
+    assumption.
+
+    invert H1.
+    invert H3.
+    constructor.
+    assumption.
+    eapply IHplug.
+    eassumption.
+    assumption.
+    assumption.
+
+    invert H0.
+    invert H2.
+    econstructor.
+    eapply IHplug.
+    eassumption.
+    assumption.
+    eassumption.
+    assumption.
+
+    invert H1.
+    invert H3.
+    econstructor.
+    eassumption.
+    eapply IHplug.
+    eassumption.
+    assumption.
+    eassumption.
+  Qed.
+
+  (* OK, now we're almost done.  Full steps really do preserve typing! *)
+  Lemma preservation : forall e1 e2,
+    step e1 e2
+    -> forall t, hasty $0 e1 t
+      -> hasty $0 e2 t.
+  Proof.
+    invert 1; simplify.
+
+    eapply generalize_plug with (e1' := e1).
+    eassumption.
+    eassumption.
+    simplify.
+    eapply preservation0.
+    eassumption.
+    assumption.
+    assumption.
+  Qed.
+(*END COPY*)
 
 Theorem safety :
   forall e t,
