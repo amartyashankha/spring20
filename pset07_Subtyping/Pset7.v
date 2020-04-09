@@ -30,7 +30,6 @@ Inductive exp  :=
 | Var (x : var)
 | Abs (x : var) (e1 : exp)
 | App (e1 e2 : exp)
-
 (* New features, surrounding *tuple* types, which build composite types out of
  * constituents *)
 | TupleNil
@@ -316,15 +315,20 @@ Qed.
 Hint Resolve tuple_cons_hasty.
 
 Lemma hasty_tuple_cons : forall e G t1 t2,
-  hasty G e (TupleTypeCons t1 t2) -> value e -> exists e1 e2, e = TupleCons e1 e2.
+  hasty G e (TupleTypeCons t1 t2) -> value e ->
+  exists e1 e2, value e1 /\ value e2 /\ e = TupleCons e1 e2.
 Proof.
-  induct e; simplify; invert H0; eauto.
+  induct 1; simplify; eauto.
+  1: invert H0; eauto.
+  1: invert H1.
+  1: invert H1.
+  1: exists e1; exists e2; propositional; assumption.
+  1: invert H1.
   1: {
-    invert H.
-    admit.
+    invert H0.
+    specialize (IHhasty t1' t2'); propositional.
   }
-  admit.
-Admitted.
+Qed.
 Hint Resolve hasty_tuple_cons.
 
 Lemma hasty_fun : forall e1 G t1 t2,
@@ -358,12 +362,16 @@ Proof.
   7: {
     invert H0; apply hasty_tuple_cons in H; try assumption.
     1: {
-      invert H. invert H0. invert H1.
+      invert H. invert H0.
+      propositional; subst.
+      invert H1.
       right.
       exists x.
       eapply StepRule with (C := Hole); eauto.
     }
-    invert H. invert H0. invert H1.
+    invert H. invert H0.
+    propositional; subst.
+    invert H1.
     right; exists (Proj x0 n0).
     eapply StepRule with (C := Hole); eauto.
   }
@@ -371,204 +379,355 @@ Proof.
 Qed.
 
 (*BEGIN COPY FROM LambdaCalculusAndTypeSoundness.v*)
-  (* Inclusion between typing contexts is preserved by adding the same new mapping
-   * to both. *)
-  Lemma weakening_override : forall (G G' : fmap var type) x t,
-    (forall x' t', G $? x' = Some t' -> G' $? x' = Some t')
-    -> (forall x' t', G $+ (x, t) $? x' = Some t'
-                      -> G' $+ (x, t) $? x' = Some t').
-  Proof.
-    simplify.
-    cases (x ==v x'); simplify; eauto.
-  Qed.
+(* Inclusion between typing contexts is preserved by adding the same new mapping
+ * to both. *)
+Lemma weakening_override : forall (G G' : fmap var type) x t,
+  (forall x' t', G $? x' = Some t' -> G' $? x' = Some t')
+  -> (forall x' t', G $+ (x, t) $? x' = Some t'
+                    -> G' $+ (x, t) $? x' = Some t').
+Proof.
+  simplify.
+  cases (x ==v x'); simplify; eauto.
+Qed.
 
-  (* This lemma lets us transplant a typing derivation into a new context that
-   * includes the old one. *)
-  Lemma weakening : forall G e t,
-    hasty G e t
-    -> forall G', (forall x t, G $? x = Some t -> G' $? x = Some t)
-      -> hasty G' e t.
-  Proof.
-    induct 1; simplify.
+(* This lemma lets us transplant a typing derivation into a new context that
+ * includes the old one. *)
+Lemma weakening : forall G e t,
+  hasty G e t
+  -> forall G', (forall x t, G $? x = Some t -> G' $? x = Some t)
+    -> hasty G' e t.
+Proof.
+  induct 1; simplify.
 
-    constructor.
-    apply H0.
-    assumption.
+  constructor.
+  apply H0.
+  assumption.
 
-    constructor.
+  constructor.
 
-    econstructor.
-    instantiate (1 := t2).
-    apply IHhasty; simplify.
-    cases (x ==v x0); subst; simplify; try assumption.
-    apply H0; assumption.
-    eauto.
+  econstructor.
+  instantiate (1 := t2).
+  apply IHhasty; simplify.
+  cases (x ==v x0); subst; simplify; try assumption.
+  apply H0; assumption.
+  eauto.
 
-    econstructor.
-    instantiate (1 := t1).
-    apply IHhasty1.
-    assumption.
-    apply IHhasty2.
-    assumption.
+  econstructor.
+  instantiate (1 := t1).
+  apply IHhasty1.
+  assumption.
+  apply IHhasty2.
+  assumption.
 
-    constructor.
+  constructor.
 
-    constructor.
-    apply IHhasty1.
-    assumption.
-    apply IHhasty2.
-    assumption.
+  constructor.
+  apply IHhasty1.
+  assumption.
+  apply IHhasty2.
+  assumption.
 
-    specialize (IHhasty G'); propositional.
-    econstructor.
-    eassumption.
-    assumption.
+  specialize (IHhasty G'); propositional.
+  econstructor.
+  eassumption.
+  assumption.
 
-    specialize (IHhasty G'); propositional.
-    econstructor.
-    eassumption.
-    assumption.
-  Qed.
+  specialize (IHhasty G'); propositional.
+  econstructor.
+  eassumption.
+  assumption.
+Qed.
 
-  (* Replacing a variable with a properly typed term preserves typing. *)
-  Lemma substitution : forall G x t' e t e',
-    hasty (G $+ (x, t')) e t
-    -> hasty $0 e' t'
-    -> hasty G (subst e' x e) t.
-  Proof.
-    induct 1; simplify.
+(* Replacing a variable with a properly typed term preserves typing. *)
+Lemma substitution : forall G x t' e t e',
+  hasty (G $+ (x, t')) e t
+  -> hasty $0 e' t'
+  -> hasty G (subst e' x e) t.
+Proof.
+  induct 1; simplify.
 
-    cases (x0 ==v x).
+  cases (x0 ==v x).
 
-    simplify.
+  simplify.
+  invert H.
+  eapply weakening.
+  eassumption.
+  simplify.
+  equality.
+
+  simplify.
+  constructor.
+  assumption.
+
+  econstructor.
+  cases (x0 ==v x).
+  simplify.
+  subst.
+  eapply weakening.
+  eassumption.
+  simplify; cases (x ==v x0); subst; simplify; equality.
+
+  specialize (IHhasty (G $+ (x0, t1)) x t').
+  assert (G $+ (x, t') $+ (x0, t1) = G $+ (x0, t1) $+ (x, t')).
+  maps_equal.
+  propositional.
+
+  econstructor.
+  eapply IHhasty1; equality.
+  eapply IHhasty2; equality.
+
+  constructor.
+
+  constructor.
+  propositional.
+  specialize (IHhasty1 G x t').
+  propositional.
+  propositional.
+
+  econstructor.
+  propositional.
+  eassumption.
+  assumption.
+  propositional.
+  eapply HtSub.
+  eassumption.
+  assumption.
+Qed.
+
+Lemma hasty_Abs : forall  G x e t,
+  hasty G (Abs x e) t ->
+  exists t1 t2, hasty (G  $+ (x, t1)) e t2 /\ Fun t1 t2 $<: t.
+Proof.
+  induct 1; tac.
+  exists x0. exists x1.
+  propositional; try assumption.
+  constructor; eauto.
+Qed.
+Hint Resolve hasty_Abs.
+
+Lemma hasty_TupleCons : forall G e1 e2 t,
+  hasty G (TupleCons e1 e2) t ->
+  exists t1 t2, hasty G e1 t1 /\ hasty G e2 t2 /\ TupleTypeCons t1 t2 $<: t.
+Proof.
+  induct 1; simplify; tac.
+  exists x.
+  exists x0.
+  propositional; eauto.
+Qed.
+Hint Resolve hasty_TupleCons.
+
+Lemma hasty_App : forall G e1 e2 t,
+  hasty G (App e1 e2) t ->
+  exists t', hasty G e1 (Fun t' t) /\ hasty G e2 t'.
+Proof.
+  induct 1; tac.
+Qed.
+Hint Resolve hasty_App.
+
+Lemma hasty_Proj0 : forall G e t,
+  hasty G (Proj e 0) t ->
+  exists t', hasty G e (TupleTypeCons t t').
+Proof.
+  induct 1; tac.
+Qed.
+Hint Resolve hasty_Proj0.
+
+Lemma hasty_Projn : forall G n e t,
+  hasty G (Proj e (S n)) t ->
+  exists t1 t2 t', hasty G e (TupleTypeCons t1 t2) /\ proj_t t2 n t' /\ t' $<: t.
+Proof.
+  induct 1; tac.
+
+  1: {
+    exists t1. exists t2. exists t.
+    propositional; eauto.
+  }
+  1: {
+    exists x. exists x0. exists x1.
+    propositional; eauto.
+  }
+Qed.
+
+(* We're almost ready for the other main property.  Let's prove it first
+ * for the more basic [step0] relation: steps preserve typing. *)
+Lemma preservation0 : forall e1 e2,
+  step0 e1 e2
+  -> forall t, hasty $0 e1 t
+    -> hasty $0 e2 t.
+Proof.
+  invert 1; simplify.
+
+  invert H.
+  invert H4.
+  eapply substitution.
+  eassumption.
+  assumption.
+
+  1: {
+    eapply hasty_Abs in H; simplify.
     invert H.
-    eapply weakening.
-    eassumption.
-    simplify.
-    equality.
-
-    simplify.
-    constructor.
-    assumption.
-
-    constructor.
-
-    constructor.
-    eapply IHhasty1; equality.
-    eapply IHhasty2; equality.
-
-    cases (x0 ==v x).
-
-    constructor.
-    eapply weakening.
-    eassumption.
-    simplify.
-    cases (x0 ==v x1).
-
-    simplify.
-    assumption.
-
-    simplify.
-    assumption.
-
-    constructor.
-    eapply IHhasty.
-    maps_equal.
-    assumption.
-
-    econstructor.
-    eapply IHhasty1; equality.
-    eapply IHhasty2; equality.
-  Qed.
-
-  (* We're almost ready for the other main property.  Let's prove it first
-   * for the more basic [step0] relation: steps preserve typing. *)
-  Lemma preservation0 : forall e1 e2,
-    step0 e1 e2
-    -> forall t, hasty $0 e1 t
-      -> hasty $0 e2 t.
-  Proof.
-    invert 1; simplify.
-
-    invert H.
-    invert H4.
+    invert H2.
+    propositional.
     eapply substitution.
+    econstructor.
     eassumption.
-    assumption.
-
+    assert (Fun x0 x1 $<: Fun t1 t); eauto.
     invert H.
-    constructor.
-  Qed.
-
-  (* We also need this key property, essentially saying that, if [e1] and [e2] are
-   * "type-equivalent," then they remain "type-equivalent" after wrapping the same
-   * context around both. *)
-  Lemma generalize_plug : forall e1 C e1',
-    plug C e1 e1'
-    -> forall e2 e2', plug C e2 e2'
-      -> (forall t, hasty $0 e1 t -> hasty $0 e2 t)
-      -> (forall t, hasty $0 e1' t -> hasty $0 e2' t).
-  Proof.
-    induct 1; simplify.
-
+    invert H2.
+    assumption.
+    assumption.
+    assumption.
+    assumption.
+    assumption.
+    assumption.
+    assumption.
+    assert (Fun x0 x1 $<: Fun t1 t); eauto.
     invert H.
-    apply H0.
-    assumption.
-
-    invert H0.
-    invert H2.
-    constructor.
-    eapply IHplug.
+    econstructor.
     eassumption.
     assumption.
-    assumption.
-    assumption.
+  }
 
-    invert H1.
-    invert H3.
-    constructor.
-    assumption.
-    eapply IHplug.
+  1: {
+    eapply hasty_App in H1; simplify.
+    invert H1; propositional.
+    eapply hasty_Abs in H1; simplify.
+    invert H1. invert H; propositional.
+    eapply substitution.
+    econstructor.
+    eassumption.
+    invert H4.
+    eauto.
+    invert H4.
+    econstructor.
     eassumption.
     assumption.
-    assumption.
+  }
 
+  1: {
+    eapply hasty_Proj0 in H; simplify.
+    invert H.
+    eapply hasty_TupleCons in H2; simplify.
+    invert H2. invert H.
+    propositional.
+    invert H4.
+    econstructor; eassumption; assumption.
+  }
+
+  eapply hasty_Projn in H. invert H. invert H2. invert H.
+  propositional.
+  econstructor 7.
+  instantiate (1 := x1).
+  2: assumption.
+  eapply hasty_TupleCons in H; simplify. invert H. invert H3.
+  propositional.
+  (*invert H4.*)
+  econstructor.
+  invert H6.
+  econstructor 7.
+  eassumption.
+  eassumption.
+  assumption.
+Qed.
+
+(* We also need this key property, essentially saying that, if [e1] and [e2] are
+ * "type-equivalent," then they remain "type-equivalent" after wrapping the same
+ * context around both. *)
+Lemma generalize_plug : forall e1 C e1',
+  plug C e1 e1'
+  -> forall e2 e2', plug C e2 e2'
+    -> (forall t, hasty $0 e1 t -> hasty $0 e2 t)
+    -> (forall t, hasty $0 e1' t -> hasty $0 e2' t).
+Proof.
+  induct 1; simplify.
+
+  invert H.
+  apply H0.
+  assumption.
+
+  1: {
+    rename e0 into E. rename e2' into E'.
     invert H0.
-    invert H2.
+    eapply hasty_App in H2. invert H2. propositional.
     econstructor.
     eapply IHplug.
     eassumption.
     assumption.
     eassumption.
     assumption.
+  }
 
+  1: {
     invert H1.
-    invert H3.
+    eapply hasty_App in H3. invert H3. propositional.
     econstructor.
     eassumption.
     eapply IHplug.
     eassumption.
     assumption.
-    eassumption.
-  Qed.
-
-  (* OK, now we're almost done.  Full steps really do preserve typing! *)
-  Lemma preservation : forall e1 e2,
-    step e1 e2
-    -> forall t, hasty $0 e1 t
-      -> hasty $0 e2 t.
-  Proof.
-    invert 1; simplify.
-
-    eapply generalize_plug with (e1' := e1).
-    eassumption.
-    eassumption.
-    simplify.
-    eapply preservation0.
-    eassumption.
     assumption.
+  }
+
+  1: {
+    rename e0 into E. rename e2' into E'.
+    invert H0.
+    eapply hasty_TupleCons in H2. invert H2. invert H0. propositional.
+    specialize (IHplug E e'0); propositional.
+    specialize (H5 x); propositional.
+    apply HtTupleCons with (e1 := e'0) (t1 := x) in H2; try assumption.
+    econstructor. eassumption. assumption.
+  }
+
+  1: {
+    rename e2' into E'.
+    invert H1.
+    eapply hasty_TupleCons in H3. invert H3. invert H1. propositional.
+    specialize (IHplug e2 e'0); propositional.
+    specialize (H7 x0); propositional.
+    apply HtTupleCons with (e1 := v1) (t1 := x) in H4; try assumption.
+    econstructor. eassumption. assumption.
+  }
+
+  1: {
+    invert H0.
+    cases n; simplify.
+    1: {
+      eapply hasty_Proj0 in H2. invert H2.
+      specialize (IHplug e2 e'0); propositional.
+      specialize H3 with (1 := H0).
+      econstructor.
+      eassumption.
+      econstructor.
+    }
+    eapply hasty_Projn in H2. invert H2. invert H0. invert H2. propositional.
+    specialize (IHplug e2 e'0); propositional.
+    specialize H5 with (1 := H2).
+    econstructor 7. instantiate (1 := x1).
+    2: assumption.
+    econstructor.
+    eassumption.
+    econstructor.
     assumption.
-  Qed.
+  }
+Qed.
+
+(* OK, now we're almost done.  Full steps really do preserve typing! *)
+Lemma preservation : forall e1 e2,
+  step e1 e2
+  -> forall t, hasty $0 e1 t
+    -> hasty $0 e2 t.
+Proof.
+  invert 1; simplify.
+
+  eapply generalize_plug with (e1' := e1).
+  eassumption.
+  eassumption.
+  simplify.
+  eapply preservation0.
+  eassumption.
+  assumption.
+  assumption.
+Qed.
 (*END COPY*)
 
 Theorem safety :
