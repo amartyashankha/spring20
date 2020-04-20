@@ -184,9 +184,11 @@ Proof.
      * component of the accumulator [a]. *)
   -
     cases (a ==n 0).
-    + step.
+    +
+      step.
       cancel.
-    + rewrite llist_nonnull by assumption.
+    +
+      rewrite llist_nonnull by assumption.
       step.
       step.
       simp.
@@ -319,9 +321,50 @@ Definition mtreep (p : nat) : hprop :=
 (* Space is provided here for additional lemmas about [mtree] and [mtree']. *)
 
 
+Lemma mtree'_null : forall {t p}, p = 0
+  -> mtree' t p === [| t = Leaf |].
+Proof.
+  heq; cases t; simplify; cancel.
+Qed.
+
+Theorem mtree_null : forall p, p = 0
+  -> mtree p === emp.
+Proof.
+  unfold mtree; simplify.
+  setoid_rewrite (mtree'_null H).
+  (* setoid_rewrite does not support "with", just positional arguments *)
+  heq; cancel.
+Qed.
+
+(*Theorem mtreep_null : forall p', p' = 0*)
+  (*(exists p', [| p <> 0 |] * [| p' = 0 |] * p |-> p' * mtree p')%sep === emp.*)
+(*Proof.*)
+  (*unfold mtree; simplify.*)
+  (*setoid_rewrite (mtree'_null H).*)
+  (*[> setoid_rewrite does not support "with", just positional arguments <]*)
+  (*heq; cancel.*)
+(*Qed.*)
+
+Lemma mtree'_nonnull : forall {t p}, p <> 0
+  -> mtree' t p === exists tl tr x pl pr, [| t = Node tl x tr |] * p |--> [pl; x; pr] * mtree' tl pl * mtree' tr pr.
+Proof.
+  heq; cases t; cancel.
+  - equality.
+  - invert H0; cancel.
+Qed.
+
+Theorem mtree_nonnull : forall {p}, p <> 0
+  -> mtree p === exists x pl pr, p |--> [pl; x; pr] * mtree pl * mtree pr.
+Proof.
+  unfold mtree; simplify.
+  setoid_rewrite (mtree'_nonnull H).
+  heq; cancel.
+Qed.
 
 
+Opaque mtree'.
 Opaque mtree.
+(*Opaque mtreep.*)
 (* ^-- Keep predicates opaque after you've finished proving all the key
 * algebraic properties about them, in order for them to work well with
 * the [cancel] tactic. *)
@@ -363,7 +406,63 @@ Theorem lookup_ok : forall x p,
     lookup x p
   {{_ ~> mtreep p}}.
 Proof.
-Admitted.
+  unfold lookup; simp.
+
+  step.
+  -
+    unfold mtreep.
+    step.
+  -
+    simp.
+    eapply HtConsequence.
+    eapply HtFrame.
+    instantiate (1 := (fun _ => mtree r)).
+    instantiate (1 := mtree r).
+    2: cancel.
+    2: unfold mtreep; cancel.
+    loop_inv (fun a : nat => mtree a)
+             (fun (a : nat) (_ : bool) => mtree a).
+    2: cancel.
+    2: cancel.
+    cases (acc ==n 0).
+    +
+      step.
+      cancel.
+    +
+      step.
+      1: {
+        rewrite mtree_nonnull by assumption.
+        step.
+      }
+      simp.
+      cases (x ==n r0); simp.
+      1: {
+        step.
+        cancel.
+        cases (acc ==n 0); simp; cancel.
+        rewrite (mtree_nonnull n).
+        cancel.
+      }
+      cases (x <=? r0); simp; cancel.
+      1: {
+        step.
+        step.
+        simp.
+        step.
+        apply exis_right with (x := (acc |-> r1 * (exists n1 : nat, (acc + 1 + 1) |-> n1 * mtree n1 * (acc + 1) |-> r0))%sep).
+        cancel.
+        rewrite (mtree_nonnull n).
+        cancel.
+      }
+      step.
+      step.
+      simp.
+      step.
+      apply exis_right with (x := ((acc + 1 + 1) |-> r1 * (exists n1 : nat, acc |-> n1 * mtree n1 * (acc + 1) |-> r0))%sep).
+      cancel.
+      rewrite (mtree_nonnull n).
+      cancel.
+Qed.
 
 
 (* And here's the operation to add a new key to a tree. *)
@@ -403,6 +502,82 @@ Theorem insert_ok : forall x p,
     insert x p
   {{_ ~> mtreep p}}.
 Proof.
+  unfold insert; simp.
+  eapply HtConsequence.
+  eapply HtFrame.
+  instantiate (1 := (fun _ => (exists p' : nat, [|p <> 0|] * p |-> p' * mtree p')%sep)).
+  instantiate (1 := (exists p' : nat, [|p <> 0|] * p |-> p' * mtree p')%sep).
+  2: {
+    unfold mtreep.
+    cancel.
+  }
+  2: {
+    unfold mtreep.
+    cancel.
+  }
+  simp.
+  eapply HtConsequence.
+  (*loop_inv (fun a : nat => mtreep a)*)
+           (*(fun (a : nat) (_ : unit) => mtreep a).*)
+  loop_inv (fun a : nat => (exists p' : nat, [|p <> 0|] * p |-> p' * mtree p')%sep)
+           (fun (a : nat) (_ : unit) => (exists p' : nat, [|p <> 0|] * p |-> p' * mtree p')%sep).
+  -
+    step.
+
+  -
+    unfold mtreep.
+    step.
+  -
+    simp.
+    eapply HtConsequence.
+    eapply HtFrame.
+    instantiate (1 := (fun _ => mtree r)).
+    instantiate (1 := mtree r).
+    2: cancel.
+    2: unfold mtreep; cancel.
+    loop_inv (fun a : nat => mtree a)
+             (fun (a : nat) (_ : bool) => mtree a).
+    2: cancel.
+    2: cancel.
+    cases (acc ==n 0).
+    +
+      step.
+      cancel.
+    +
+      step.
+      1: {
+        rewrite mtree_nonnull by assumption.
+        step.
+      }
+      simp.
+      cases (x ==n r0); simp.
+      1: {
+        step.
+        cancel.
+        cases (acc ==n 0); simp; cancel.
+        rewrite (mtree_nonnull n).
+        cancel.
+      }
+      cases (x <=? r0); simp; cancel.
+      1: {
+        step.
+        step.
+        simp.
+        step.
+        apply exis_right with (x := (acc |-> r1 * (exists n1 : nat, (acc + 1 + 1) |-> n1 * mtree n1 * (acc + 1) |-> r0))%sep).
+        cancel.
+        rewrite (mtree_nonnull n).
+        cancel.
+      }
+      step.
+      step.
+      simp.
+      step.
+      apply exis_right with (x := ((acc + 1 + 1) |-> r1 * (exists n1 : nat, acc |-> n1 * mtree n1 * (acc + 1) |-> r0))%sep).
+      cancel.
+      rewrite (mtree_nonnull n).
+      cancel.
+Qed.
 Admitted.
 
 (* Our solution also includes a proof that the Hoare triples in this pset
