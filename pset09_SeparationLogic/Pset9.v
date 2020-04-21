@@ -503,10 +503,15 @@ Theorem insert_ok : forall x p,
   {{_ ~> mtreep p}}.
 Proof.
   unfold insert; simp.
-  eapply HtConsequence.
-  eapply HtFrame.
-  instantiate (1 := (fun _ => (exists p' : nat, [|p <> 0|] * p |-> p' * mtree p')%sep)).
-  instantiate (1 := (exists p' : nat, [|p <> 0|] * p |-> p' * mtree p')%sep).
+  loop_inv (fun a : nat => (exists q' : nat, [|a <> 0|]
+                                             * a |-> q'
+                                             * mtree q'
+           )%sep)
+           (fun (a : nat) (_ : unit) => (exists q' : nat, [|a <> 0|]
+                                                             * a |-> q'
+                                                             * mtree q'
+                                                             * [|q' <> 0|]
+           )%sep).
   2: {
     unfold mtreep.
     cancel.
@@ -516,69 +521,50 @@ Proof.
     cancel.
   }
   simp.
-  eapply HtConsequence.
-  (*loop_inv (fun a : nat => mtreep a)*)
-           (*(fun (a : nat) (_ : unit) => mtreep a).*)
-  loop_inv (fun a : nat => (exists p' : nat, [|p <> 0|] * p |-> p' * mtree p')%sep)
-           (fun (a : nat) (_ : unit) => (exists p' : nat, [|p <> 0|] * p |-> p' * mtree p')%sep).
+  cases (r ==n 0); simp; step; cancel.
+  - step.
   -
+    simp.
     step.
-
+    step.
+    step.
+    step.
+    simp.
+    step.
+    eapply exis_right.
+    instantiate (1 := r).
+    cancel.
+    rewrite (mtree_null 0).
+    cancel.
+    trivial.
+    rewrite (mtree_nonnull H).
+    cancel.
+    rewrite (mtree_null 0).
+    cancel.
+    trivial.
+    trivial.
   -
-    unfold mtreep.
+    rewrite (mtree_nonnull n).
     step.
   -
     simp.
-    eapply HtConsequence.
-    eapply HtFrame.
-    instantiate (1 := (fun _ => mtree r)).
-    instantiate (1 := mtree r).
-    2: cancel.
-    2: unfold mtreep; cancel.
-    loop_inv (fun a : nat => mtree a)
-             (fun (a : nat) (_ : bool) => mtree a).
-    2: cancel.
-    2: cancel.
-    cases (acc ==n 0).
+    cases (x <=? r0).
     +
       step.
+      apply exis_right with (x := ((r + 1) |-> r0 * (exists n0 : nat, (r + 1 + 1) |-> n0 * mtree n0) * acc |-> r)%sep).
+      cancel.
+      cancel.
+      rewrite (mtree_nonnull n).
       cancel.
     +
       step.
-      1: {
-        rewrite mtree_nonnull by assumption.
-        step.
-      }
-      simp.
-      cases (x ==n r0); simp.
-      1: {
-        step.
-        cancel.
-        cases (acc ==n 0); simp; cancel.
-        rewrite (mtree_nonnull n).
-        cancel.
-      }
-      cases (x <=? r0); simp; cancel.
-      1: {
-        step.
-        step.
-        simp.
-        step.
-        apply exis_right with (x := (acc |-> r1 * (exists n1 : nat, (acc + 1 + 1) |-> n1 * mtree n1 * (acc + 1) |-> r0))%sep).
-        cancel.
-        rewrite (mtree_nonnull n).
-        cancel.
-      }
-      step.
-      step.
-      simp.
-      step.
-      apply exis_right with (x := ((acc + 1 + 1) |-> r1 * (exists n1 : nat, acc |-> n1 * mtree n1 * (acc + 1) |-> r0))%sep).
+      apply exis_right with (x := ((r + 1) |-> r0 * (exists n1 : nat, r |-> n1 * mtree n1) * acc |-> r)%sep).
+      cancel.
+      2: linear_arithmetic.
       cancel.
       rewrite (mtree_nonnull n).
       cancel.
 Qed.
-Admitted.
 
 (* Our solution also includes a proof that the Hoare triples in this pset
  * correspond to the usual operational semantics... which you do not need
