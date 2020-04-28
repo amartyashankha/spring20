@@ -220,18 +220,52 @@ Proof.
   }
   1: {
     invert H.
-    assert (forall x : nat, locksOf l0 x -> l x); sets.
+    assert (forall x : nat, locksOf l0 x -> l x); sets; excluded_middle (a \in locksOf l0); sets.
+    1: {
+      left.
+      invert H4.
+      eapply step_cat; eauto.
+    }
+    1: {
+      (*eexists. eapply StepThread1.*)
+      (*econstructor.*)
+      eapply who_has_the_lock'' in H6.
+      2: sets; eassumption.
+      2: instantiate (1 := l); sets.
+      propositional; eauto.
+      1: {
+        invert H4.
+        specialize (H8 r).
+        invert H8; eauto.
+      }
+      left.
+      invert H5. invert H4. invert H5.
+      eexists.
+      eapply StepThread1.
+      econstructor; eassumption.
+    }
     left.
     invert H1.
-    eapply step_cat; eassumption.
+    eapply step_cat; eauto.
   }
-    eapply sets_equal in H2.
-  simplify.
-  invert H; simplify; eauto.
-  1: invert H0.
-  (*invert H2.*)
-  (*apply who_has_the_lock' with (h := h) (a := a) (l := l) in H2.*)
-Admitted.
+  1: invert H; sets.
+  invert H.
+  assert (s = {a0}) by sets.
+  cases (a ==n a0); subst.
+  1: {
+    left.
+    assert (a0 \in l).
+    1: sets.
+    eexists.
+    eapply StepThread1.
+    econstructor; eassumption.
+  }
+  assert (a \in locksOf l0); sets.
+  assert (forall x : nat, locksOf l0 x -> l x); sets.
+  left.
+  invert H3.
+  eapply step_cat; eassumption.
+Qed.
 
 Theorem if_lock_held_then_progress : forall bound a h p,
    Forall (fun l_c => goodCitizen (fst l_c) (snd l_c) {}) p
@@ -241,7 +275,19 @@ Theorem if_lock_held_then_progress : forall bound a h p,
       \/ exists h_l_p', step (h, locksOf p, progOf p) h_l_p'.
 Proof.
   induct bound; simplify; eauto.
-Admitted.
+  1: invert H1.
+
+  excluded_middle (a < bound).
+  1: {
+    specialize (IHbound a h p); propositional.
+  }
+  assert (bound = a) by linear_arithmetic.
+  pose proof (who_has_the_lock (locksOf p) h a p H); try eassumption.
+  assert (locksOf p \subseteq locksOf p) by sets.
+  propositional.
+  invert H6; propositional.
+  specialize (IHbound x h p); propositional.
+Qed.
 
 Lemma deadlock_freedom' :
   forall (h : heap) (p : prog'),
